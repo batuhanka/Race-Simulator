@@ -23,24 +23,23 @@ struct HavaData {
     var nem: Int
     var sicaklik: Int
     
-    // Default value
-        static let `default` = HavaData(
-            aciklama: 0,
-            cimPistagirligi: 0,
-            cimEn: "",
-            cimTr: "",
-            gece: 1,
-            havaDurumIcon: "default-icon",
-            havaEn: "Unknown",
-            havaTr: "Bilinmiyor",
-            hipodromAdi: "Unknown Hipodrome",
-            hipodromYeri: "Unknown Location",
-            kumPistagirligi: 0,
-            kumEn: "Unknown",
-            kumTr: "Bilinmiyor",
-            nem: 0,
-            sicaklik: 0
-        )
+    static let `default` = HavaData(
+        aciklama: 0,
+        cimPistagirligi: 0,
+        cimEn: "",
+        cimTr: "",
+        gece: 1,
+        havaDurumIcon: "default-icon",
+        havaEn: "Unknown",
+        havaTr: "Bilinmiyor",
+        hipodromAdi: "Unknown Hipodrome",
+        hipodromYeri: "Unknown Location",
+        kumPistagirligi: 0,
+        kumEn: "Unknown",
+        kumTr: "Bilinmiyor",
+        nem: 0,
+        sicaklik: 0
+    )
     
 }
 
