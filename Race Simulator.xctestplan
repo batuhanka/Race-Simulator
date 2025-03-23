@@ -1,0 +1,37 @@
+{
+  "configurations" : [
+    {
+      "id" : "F9560877-B35D-408B-8FB9-70D20CC2EA05",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Race Simulator.xcodeproj",
+      "identifier" : "DFD4B72F2D8361F100050A45",
+      "name" : "Race Simulator"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Race Simulator.xcodeproj",
+        "identifier" : "DFD4B73F2D8361F200050A45",
+        "name" : "Race SimulatorTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Race Simulator.xcodeproj",
+        "identifier" : "DFD4B7492D8361F200050A45",
+        "name" : "Race SimulatorUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
