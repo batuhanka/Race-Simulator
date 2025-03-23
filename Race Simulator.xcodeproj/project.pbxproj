@@ -24,6 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		DF498A812D90A2AB000AEB60 /* Race Simulator.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Race Simulator.xctestplan"; sourceTree = "<group>"; };
 		DFD4B7302D8361F100050A45 /* Race Simulator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Race Simulator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFD4B7402D8361F200050A45 /* Race SimulatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Race SimulatorTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFD4B74A2D8361F200050A45 /* Race SimulatorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Race SimulatorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +76,7 @@
 		DFD4B7272D8361F100050A45 = {
 			isa = PBXGroup;
 			children = (
+				DF498A812D90A2AB000AEB60 /* Race Simulator.xctestplan */,
 				DFD4B7322D8361F100050A45 /* Race Simulator */,
 				DFD4B7432D8361F200050A45 /* Race SimulatorTests */,
 				DFD4B74D2D8361F200050A45 /* Race SimulatorUITests */,
@@ -399,6 +401,7 @@
 				DEVELOPMENT_TEAM = 5UZF62AKBA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Race-Simulator-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +431,7 @@
 				DEVELOPMENT_TEAM = 5UZF62AKBA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Race-Simulator-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

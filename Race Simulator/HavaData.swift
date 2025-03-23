@@ -1,3 +1,11 @@
+//
+//  HavaData.swift
+//  Race Simulator
+//
+//  Created by Batuhan KANDIRAN on 20.03.2025.
+//
+
+
 struct HavaData {
     var aciklama: Int
     var cimPistagirligi: Int
@@ -14,6 +22,26 @@ struct HavaData {
     var kumTr: String
     var nem: Int
     var sicaklik: Int
+    
+    // Default value
+        static let `default` = HavaData(
+            aciklama: 0,
+            cimPistagirligi: 0,
+            cimEn: "",
+            cimTr: "",
+            gece: 1,
+            havaDurumIcon: "default-icon",
+            havaEn: "Unknown",
+            havaTr: "Bilinmiyor",
+            hipodromAdi: "Unknown Hipodrome",
+            hipodromYeri: "Unknown Location",
+            kumPistagirligi: 0,
+            kumEn: "Unknown",
+            kumTr: "Bilinmiyor",
+            nem: 0,
+            sicaklik: 0
+        )
+    
 }
 
 extension HavaData {
