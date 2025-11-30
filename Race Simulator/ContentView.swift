@@ -17,12 +17,15 @@ struct RaceCardButton: View {
     // Şehre özel basit bir simge seçimi
     private func getCityIcon() -> String {
         switch raceName.uppercased() {
-        case "İSTANBUL": return "building.2.crop.circle"
-        case "ANKARA": return "building.columns.circle"
-        case "İZMİR": return "sun.max.circle"
-        case "ADANA": return "flame.circle"
-        case "ŞANLIURFA": return "star.circle"
-        default: return "figure.equestrian.circle"
+        case "ISTANBUL": return "34.circle.fill"
+        case "ANKARA": return "06.circle.fill"
+        case "IZMIR": return "35.circle.fill"
+        case "ADANA": return "01.circle.fill"
+        case "BURSA": return "16.circle.fill"
+        case "DIYARBAKIR": return "21.circle.fill"
+        case "ANTALYA": return "07.circle.fill"
+        case "ELAZIG": return "23.circle.fill"
+        default: return "star.circle.fill"
         }
     }
     
@@ -107,7 +110,6 @@ struct ContentView: View {
     
     // MARK: - Initialization & State
     init() {
-        // UIPageControl ayarları artık kullanılmasa da bırakıldı.
         UIPageControl.appearance().pageIndicatorTintColor = UIColor.gray
         UIPageControl.appearance().currentPageIndicatorTintColor = UIColor.black
     }
@@ -128,17 +130,14 @@ struct ContentView: View {
     
     let parser = JsonParser()
     
-    // MARK: - Date Logic
-    
-    // Tarih formatını sadece "E, dd MMMM" (örn: Cmt, 08 Kasım) olarak ayarlar
+    // MARK: - Date Logic (Unchanged)
     private var displayDateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR") // Türkçe format için
+        formatter.locale = Locale(identifier: "tr_TR")
         formatter.dateFormat = "E, dd MMMM"
         return formatter
     }
     
-    // Veri çekmek için kullanılan format (yyyyMMdd)
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd"
@@ -156,12 +155,8 @@ struct ContentView: View {
     // MARK: - Actions
     private func changeDate(by days: Int) {
         if let newDate = Calendar.current.date(byAdding: .day, value: days, to: selectedDate) {
-            
-            // Tarihin min/max sınırlar içinde olup olmadığını kontrol et
             if newDate >= minDate && newDate <= maxDate {
                 selectedDate = newDate
-                
-                // Tarih değiştiğinde yarışları yükle
                 Task {
                     races = try await parser.getRaceCities(raceDate: dateFormatter.string(from: newDate))
                 }
@@ -171,115 +166,106 @@ struct ContentView: View {
     
     // MARK: - Body
     var body: some View {
-        NavigationStack {
-            VStack {
-                Spacer() // Üst boşluk
-                 
-                // MARK: - Date Picker (Yeni Tasarım)
-                HStack {
-                     
-                    // SOL BUTON: Geri Git
-                    Button(action: {
-                        changeDate(by: -1)
-                    }) {
-                        Image(systemName: "chevron.left.circle.fill")
-                            .font(.title)
-                            .foregroundColor(selectedDate > minDate ? .white : .gray) // Sınır kontrolü
-                    }
-                    .disabled(selectedDate <= minDate) // Sınır kontrolü
-                     
-                    Spacer()
-                     
-                    // MERKEZ: Tarih Görüntüleme
-                    Text(displayDateFormatter.string(from: selectedDate))
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.vertical, 10)
-                        .lineLimit(1)
-                     
-                    Spacer()
-                     
-                    // SAĞ BUTON: İleri Git
-                    Button(action: {
-                        changeDate(by: 1)
-                    }) {
-                        Image(systemName: "chevron.right.circle.fill")
-                            .font(.title)
-                            .foregroundColor(selectedDate < maxDate ? .white : .gray) // Sınır kontrolü
-                    }
-                    .disabled(selectedDate >= maxDate) // Sınır kontrolü
-                     
-                }
-                .padding(.horizontal, 25)
-                .frame(height: 70) // Yüksekliği sabit tutarak şıklık kat
-                // BURASI GÜNCELLENDİ: Maksimum genişlik 300 olarak ayarlandı.
-                .frame(maxWidth: 300)
-                .background(
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(
-                            LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.8), Color.indigo.opacity(0.7)]),
-                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 15)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        )
-                )
-                .shadow(color: .indigo.opacity(0.5), radius: 10, x: 0, y: 5)
-                // .padding(.horizontal) kaldırıldı, çünkü .frame(maxWidth: 300) merkezlemeyi kolaylaştırıyor.
-                .padding(.bottom, 20)
+            
+            // EN DIŞ KATMAN: TÜM EKRAN İÇİN SİYAH ARKA PLAN
+            ZStack { // 👈 Yeni eklenen ZStack
                 
-                // MARK: - Race Buttons (Cards)
-                if races.isEmpty {
-                    Text("Seçili tarihte yarış programı bulunamadı.")
-                        .foregroundColor(.secondary)
-                        .padding(.top, 20)
-                } else {
-                    HStack {
-                        Spacer()
+                Color.black // 👈 En dış katmanı tamamen siyah yapar.
+                    .ignoresSafeArea(.all)
+                
+                NavigationStack {
+                    ZStack {
                         
-                        VStack(spacing: 15) {
-                            ForEach(races, id: \.self) { race in
-                                RaceCardButton(
-                                                    raceName: race,
-                                                    selectedRace: $selectedRace,
-                                                    selectedDate: $selectedDate,
-                                                    showRaceDetails: $showRaceDetails,
-                                                    havaData: $havaData,
-                                                    kosular: $kosular,
-                                                    agf: $agf,
-                                                    parser: parser,
-                                                    dateFormatter: dateFormatter)
+                        // 1. TAM EKRAN ARKA PLAN GÖRÜNTÜSÜ
+                        // Görüntü tam dolmazsa bile, arkası zaten siyahtır.
+                        Image("back")
+                            .resizable()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .ignoresSafeArea(.all)
+                        
+                        VStack {
+                            
+                            // Header/Logo Boşluğu (Değeri ince ayar yapın: 170-190 arası)
+                            Spacer().frame(height: 170) // 👈 Safe Area + Logo Yüksekliği
+                            
+                            // MARK: - Date Picker (Hstack)
+                            // ... (Tarih seçici içeriği aynı) ...
+                            HStack {
+                                // SOL BUTON: Geri Git
+                                Button(action: { changeDate(by: -1) }) {
+                                    Image(systemName: "chevron.left.circle.fill").font(.title)
+                                        .foregroundColor(selectedDate > minDate ? .white : .gray)
+                                }
+                                .disabled(selectedDate <= minDate)
+                                
+                                Spacer()
+                                
+                                // MERKEZ: Tarih Görüntüleme
+                                Text(displayDateFormatter.string(from: selectedDate))
+                                    .font(.headline).fontWeight(.bold).foregroundColor(.white)
+                                    .padding(.vertical, 10).lineLimit(1)
+                                
+                                Spacer()
+                                
+                                // SAĞ BUTON: İleri Git
+                                Button(action: { changeDate(by: 1) }) {
+                                    Image(systemName: "chevron.right.circle.fill").font(.title)
+                                        .foregroundColor(selectedDate < maxDate ? .white : .gray)
+                                }
+                                .disabled(selectedDate >= maxDate)
+                                
+                            }
+                            .padding(.horizontal, 25)
+                            .frame(height: 70)
+                            .frame(maxWidth: 300)
+                            .background(
+                                // ... (Background modifiyeleri aynı) ...
+                                RoundedRectangle(cornerRadius: 15)
+                                    .fill(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.8), Color.indigo.opacity(0.7)]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color.white.opacity(0.3), lineWidth: 1))
+                            )
+                            .shadow(color: .indigo.opacity(0.5), radius: 10, x: 0, y: 5)
+                            .padding(.bottom, 20)
+                            
+                            // MARK: - Race Buttons (Cards)
+                            if races.isEmpty {
+                                Text("Seçili tarihte yarış programı bulunamadı.")
+                                    .foregroundColor(.white.opacity(0.7)).padding(.top, 20)
+                            } else {
+                                HStack {
+                                    Spacer()
+                                    VStack(spacing: 15) {
+                                        ForEach(races, id: \.self) { race in
+                                            RaceCardButton(raceName: race, selectedRace: $selectedRace, selectedDate: $selectedDate, showRaceDetails: $showRaceDetails, havaData: $havaData, kosular: $kosular, agf: $agf, parser: parser, dateFormatter: dateFormatter)
+                                        }
+                                    }
+                                    .padding(.vertical)
+                                    Spacer()
+                                }
+                                .padding(.horizontal)
+                            }
+                            
+                            Spacer()
+                            
+                            // MARK: - Navigation Link
+                            .navigationDestination(isPresented: $showRaceDetails) {
+                                RaceDetailView(raceName: selectedRace ?? "Yarış Detayı", havaData: havaData ?? HavaData.default, kosular: kosular, agf: agf)
                             }
                         }
-                        .padding(.vertical)
-                        
-                        Spacer()
                     }
-                    .padding(.horizontal)
-                }
-                
-                Spacer() // Alt boşluk
-                
-                // MARK: - Navigation Link
-                .navigationDestination(isPresented: $showRaceDetails) {
-                    RaceDetailView(raceName: selectedRace ?? "Yarış Detayı", havaData: havaData ?? HavaData.default, kosular: kosular, agf: agf)
-                }
-                
-            }
-            .onAppear() {
-                Task{
-                    races = try await parser.getRaceCities(raceDate: dateFormatter.string(from: selectedDate))
+                    .onAppear() {
+                        Task{
+                            races = try await parser.getRaceCities(raceDate: dateFormatter.string(from: selectedDate))
+                        }
+                    }
+                    // .padding(.bottom) KESİNLİKLE KALDIRILDI!
+                    .navigationTitle("")
+                    .toolbar(.hidden, for: .navigationBar)
                 }
             }
-            .padding(.bottom)
-            .navigationTitle("")
-            .toolbar(.hidden, for: .navigationBar)
         }
-    }
     
-    // MARK: - Helper Function
+    // Helper function (Unchanged)
     func convertToRaces(from kosular: [[String: Any]]) -> [Race] {
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: kosular, options: [])
