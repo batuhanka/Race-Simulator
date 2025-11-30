@@ -11,24 +11,21 @@ struct ListItemView: View {
     let at: Horse
     
     var body: some View {
-        // Ana Kapsayıcı
+       
         VStack(spacing: 0) {
             
-            // Üst Bilgi Satırı (Numara, At Adı, Jokey Adı)
             HStack(alignment: .top) {
                 
-                // Sol Üst Köşe: Numara ve At Adı Badge'i
                 HStack(spacing: 0) {
-                    // Koşu Numarası (Arka Plan: Mavi)
                     Text(at.NO ?? "")
-                        .font(.caption) // Daha küçük font
+                        .font(.caption)
                         .fontWeight(.bold)
-                        .padding(.horizontal, 5) // Padding minimalize edildi
+                        .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .foregroundColor(Color.teal)
                     
                     Text(at.AD ?? "")
-                        .font(.caption) // Daha küçük font
+                        .font(.caption)
                         .fontWeight(.medium)
                         .padding(.vertical, 3)
                         .padding(.horizontal, 6)
@@ -45,14 +42,13 @@ struct ListItemView: View {
                 
                 Spacer()
                 
-                // Sağ Üst Köşe: Jokey Adı
                 VStack(alignment: .trailing) {
                     Text(at.JOKEYADI ?? "")
                         .font(.caption2)
                         .fontWeight(.semibold)
                 }
             }
-            .padding(.bottom, 6) // Alt boşluk azaltıldı
+            .padding(.bottom, 6)
             
             
             HStack(alignment: .top, spacing: 10) {
@@ -73,7 +69,7 @@ struct ListItemView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     
                     HStack(spacing: 6) {
-                        Text(at.YAS ?? "") // Yaş ve Cinsiyet
+                        Text(at.YAS ?? "")
                             .font(.caption2)
                         Text("\(at.KILO ?? 0)kg") // Kilo
                             .font(.caption2)
@@ -90,16 +86,15 @@ struct ListItemView: View {
                 
                 VStack(alignment: .trailing, spacing: 4) {
                     
-                    // Sahip Bilgisi
+
                     VStack(alignment: .trailing) {
                         Text("\(at.SAHIPADI ?? "")")
-                            .font(.system(size: 8)) // En küçük font
+                            .font(.system(size: 8))
                             .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         
                     }
 
-                    // Antrenör Bilgisi - Kırmızı Çerçeveli Badge
                     Text("\(at.ANTRENORADI ?? "")")
                         .font(.system(size: 8))
                         .fontWeight(.medium)
@@ -121,9 +116,9 @@ struct ListItemView: View {
             }
             
         }
-        .padding(8) // Dış padding son kez küçültüldü
+        .padding(8)
         .background(Color(.systemBackground))
         .cornerRadius(10)
-        .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1) // Gölge yumuşatıldı
+        .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1) 
     }
 }
