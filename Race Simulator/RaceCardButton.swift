@@ -1,10 +1,3 @@
-//
-//  RaceCardView.swift
-//  Race Simulator
-//
-//  Created by Batuhan KANDIRAN on 29.12.2025.
-//
-
 import SwiftUI
 
 // MARK: - Button Press Effect
@@ -19,7 +12,6 @@ struct CardPressEffectStyle: ButtonStyle {
 
 // MARK: - Race Card Button
 struct RaceCardButton: View {
-
     let raceName: String
     @Binding var selectedRace: String?
     @Binding var selectedDate: Date
@@ -33,58 +25,78 @@ struct RaceCardButton: View {
 
     @State private var isFetching: Bool = false
 
-    private func getCityIcon() -> String {
-        let city = raceName.uppercased(with: Locale(identifier: "tr_TR"))
-        switch city {
-        case "İSTANBUL", "ISTANBUL": return "34.circle.fill"
-        case "ANKARA": return "06.circle.fill"
-        case "İZMİR", "IZMIR": return "35.circle.fill"
-        case "ADANA": return "01.circle.fill"
-        case "BURSA": return "16.circle.fill"
-        case "DIYARBAKIR": return "21.circle.fill"
-        case "ANTALYA": return "07.circle.fill"
-        case "ELAZIG": return "23.circle.fill"
-        default: return "star.circle.fill"
+    // MARK: - Otomatik Görsel İsimlendirme
+    private func getBackgroundImageName() -> String {
+        // Küçük harfe çevir (Türkçe karakter duyarlı: İ -> i)
+        var name = raceName.lowercased(with: Locale(identifier: "tr_TR"))
+        
+        // Türkçe karakterleri temizle
+        let replacements = [
+            "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u", "i̇": "i"
+        ]
+        
+        for (target, replacement) in replacements {
+            name = name.replacingOccurrences(of: target, with: replacement)
         }
+        
+        // "istanbul" -> "istanbulhipodrom"
+        return name + "hipodrom"
     }
 
     var body: some View {
         Button(action: fetchRaceDetails) {
-            HStack(spacing: 15) {
-
-                if isFetching {
-                    ProgressView()
-                        .tint(.white)
-                        .frame(width: 30, height: 30)
-                } else {
-                    Image(systemName: getCityIcon())
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 30, height: 30)
-                }
-
-                Text(raceName)
-                    .font(.title3)
-                    .fontWeight(.heavy)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-            }
-            .foregroundColor(.white)
-            .padding(.vertical, 15)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: 300)
-            .background(
+            ZStack {
+                // 1. Arka Plan Resmi
+                Image(getBackgroundImageName())
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 320, height: 100)
+                    .clipped()
+                
+                // 2. Gradyan Katmanı (Yazıların okunması için)
                 LinearGradient(
-                    gradient: Gradient(colors: [Color.teal, Color.cyan]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0.85),
+                        Color.black.opacity(0.4),
+                        Color.clear
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
+
+                // 3. İçerik
+                HStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .tracking(1) // Harf arası boşluk
+                        
+                    }
+                    
+                    Spacer()
+                    
+                    if isFetching {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.2)
+                    } else {
+                        Image(systemName: "chevron.right.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 25)
+            }
+            .frame(height: 110)
+            .frame(maxWidth: .infinity)
+            .background(Color.gray.opacity(0.2)) 
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
             )
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.15), radius: 5, x: 0, y: 3)
+            .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 6)
         }
         .buttonStyle(CardPressEffectStyle())
         .disabled(isFetching)
@@ -94,34 +106,25 @@ struct RaceCardButton: View {
         isFetching = true
         Task {
             defer { isFetching = false }
-
             do {
                 let program = try await parser.getProgramData(
                     raceDate: dateFormatter.string(from: selectedDate),
                     cityName: raceName
                 )
-
-                if let havaDict = program["hava"] as? [String: Any] {
-                    havaData = HavaData(from: havaDict)
-                }
-
+                if let havaDict = program["hava"] as? [String: Any] { havaData = HavaData(from: havaDict) }
                 if let kosularArray = program["kosular"] as? [[String: Any]] {
                     let data = try JSONSerialization.data(withJSONObject: kosularArray)
                     kosular = try JSONDecoder().decode([Race].self, from: data)
                 }
-
-                if let agfArray = program["agf"] as? [[String: Any]] {
-                    agf = agfArray
-                }
-
+                if let agfArray = program["agf"] as? [[String: Any]] { agf = agfArray }
                 await MainActor.run {
                     selectedRace = raceName
                     showRaceDetails = true
                 }
-
             } catch {
                 print("Detay getirme hatası: \(error)")
             }
         }
     }
 }
+

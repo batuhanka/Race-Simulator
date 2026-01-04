@@ -1,285 +1,273 @@
 import SwiftUI
 
-// MARK: - 1. YAN MENÜ BİLEŞENİ
-struct SideMenuView: View {
-    let kosular: [Race]
-    @Binding var selectedIndex: Int
-    @Binding var isMenuOpen: Bool
-    
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 20) {
-                // Menü Başlığı
-                Text("Yarış Programı")
-                    .font(.title2.bold())
-                    .padding(.top, 60)
-                    .padding(.horizontal)
-                
-                // Koşu Listesi
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(kosular.indices, id: \.self) { index in
-                            Button(action: {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    selectedIndex = index
-                                    isMenuOpen = false
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: "clock.fill")
-                                        .font(.caption)
-                                    Text("\(kosular[index].RACENO ?? "0"). Koşu")
-                                        .fontWeight(selectedIndex == index ? .bold : .regular)
-                                    Spacer()
-                                    Text(kosular[index].SAAT ?? "")
-                                        .font(.caption)
-                                        .monospacedDigit()
-                                }
-                                .padding()
-                                .background(selectedIndex == index ? Color.blue.opacity(0.15) : Color.clear)
-                                .foregroundColor(selectedIndex == index ? .blue : .primary)
-                            }
-                            Divider().padding(.horizontal)
-                        }
-                    }
-                }
-                Spacer()
-                
-                // Alt Bilgi
-                Text("TJK Verileriyle Senkronize")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .padding()
-            }
-            .frame(width: 270)
-            .background(Color(.systemBackground))
-            .offset(x: isMenuOpen ? 0 : -270) // Menü kayma efekti
-            
-            // Boş alan (Kapatma tetikleyicisi için)
-            if isMenuOpen {
-                Color.black.opacity(0.01)
-                    .onTapGesture {
-                        withAnimation(.spring()) { isMenuOpen = false }
-                    }
-            } else {
-                Spacer()
-            }
-        }
-        .ignoresSafeArea()
-    }
-}
-
-// MARK: - 2. ANA DETAY GÖRÜNÜMÜ
 struct RaceDetailView: View {
-    var raceName: String
-    var havaData: HavaData
-    var kosular: [Race]
-    var agf: [[String: Any]]
+    // MARK: - PROPERTIES
+    @State var raceName: String
+    @State var havaData: HavaData
+    @State var kosular: [Race]
+    @State var agf: [[String: Any]]
     
-    @State private var selectedIndex = 0
-    @State private var isMenuOpen = false
+    let allRaces: [String]
+    let selectedDate: Date
     
-    // Pist tipine göre dinamik renkler
+    @State private var selectedIndex: Int = 0
+    @State private var isRefreshing: Bool = false
+    
+    let parser = JsonParser()
+    let apiDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyyMMdd"
+        return f
+    }()
+    
+    // MARK: - PİST RENKLERİ
     private func getPistColors(for index: Int) -> [Color] {
-        guard kosular.indices.contains(index) else { return [Color.gray, Color.black] }
+        guard kosular.indices.contains(index) else {
+            return [Color.black, Color.black]
+        }
+        
         let pist = (kosular[index].PIST ?? "").lowercased(with: Locale(identifier: "tr_TR"))
         
         if pist.contains("cim") || pist.contains("çim") {
-            return [Color.green.opacity(0.4), Color.green.opacity(0.8)]
+            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
         } else if pist.contains("kum") {
-            return [Color.orange.opacity(0.4), Color.brown.opacity(0.8)]
+            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
         } else if pist.contains("sentetik") {
-            return [Color.blue.opacity(0.3), Color.gray.opacity(0.6)]
+            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
         } else {
-            return [Color.gray.opacity(0.3), Color.black.opacity(0.4)]
+            return [Color.gray.opacity(0.3), Color.black.opacity(0.9)]
         }
     }
     
+    // MARK: - BODY
     var body: some View {
-        ZStack {
-            // --- ANA İÇERİK KATMANI ---
-            VStack(spacing: 0) {
-                headerBilgiAlani
-                
+        VStack(spacing: 0) {
+            headerBilgiAlani
+            
+            kosuSekmeSecici
+            
+            if isRefreshing {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.cyan)
+                        .scaleEffect(1.5)
+                    Text("Veriler Güncelleniyor...")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.top)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            } else {
                 if kosular.indices.contains(selectedIndex) {
                     List {
                         let seciliKosu = kosular[selectedIndex]
+                        
                         if let atlar = seciliKosu.atlar, !atlar.isEmpty {
                             ForEach(atlar) { at in
-                                // At kartı bileşeniniz (ListItemView)
                                 ListItemView(at: at)
                             }
+                            
+                            Color.clear
+                                .frame(height: 40)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                         } else {
-                            ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
+                            ContentUnavailableView(
+                                "At Bilgisi Yok",
+                                systemImage: "horse.fill"
+                            )
                         }
                     }
+                    .id("List_\(raceName)_\(selectedIndex)") // Şehir veya Koşu değişince List'i sıfırla
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                 }
-                
-                footerKosuSecici
             }
-            .background(
-                LinearGradient(gradient: Gradient(colors: getPistColors(for: selectedIndex)),
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                .ignoresSafeArea()
-            )
-            // Menü açıldığında içeriği sağa itme ve küçültme
-            .scaleEffect(isMenuOpen ? 0.92 : 1)
-            .offset(x: isMenuOpen ? 270 : 0)
-            .disabled(isMenuOpen)
-            
-            // --- KARARTMA (OVERLAY) ---
-            if isMenuOpen {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring()) { isMenuOpen = false }
-                    }
-            }
-            
-            // --- YAN MENÜ KATMANI ---
-            SideMenuView(kosular: kosular, selectedIndex: $selectedIndex, isMenuOpen: $isMenuOpen)
         }
-        .navigationTitle(raceName)
+        .background(
+            RadialGradient(
+                gradient: Gradient(colors: [Color.black.opacity(0.9), Color.clear]),
+                center: .top,
+                startRadius: 0,
+                endRadius: 1200
+            )
+            .ignoresSafeArea()
+        )
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .principal) {
+                dropdownTitleMenu
+            }
+        }
+        .onChange(of: raceName) { oldValue, newValue in
+            fetchNewCityData(cityName: newValue)
+        }
+    }
+    
+    // MARK: - DROPDOWN MENU
+    private var dropdownTitleMenu: some View {
+        Menu {
+            ForEach(allRaces, id: \.self) { city in
                 Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isMenuOpen.toggle()
+                    withAnimation {
+                        self.raceName = city
                     }
                 } label: {
-                    Image(systemName: isMenuOpen ? "xmark" : "line.3.horizontal")
-                        .fontWeight(.bold)
+                    HStack {
+                        Text(city)
+                        if city == raceName {
+                            Image(systemName: "checkmark")
+                        }
+                    }
                 }
             }
+        } label: {
+            HStack(spacing: 6) {
+                Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                
+                Image(systemName: "chevron.down.circle.fill")
+                    .font(.subheadline)
+                    .foregroundColor(.cyan)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.2)))
         }
     }
     
-    // Üst Bilgi Paneli
-    var headerBilgiAlani: some View {
+    // MARK: - ÜST BİLGİ PANELİ
+    private var headerBilgiAlani: some View {
         Group {
             if kosular.indices.contains(selectedIndex) {
-                let currentKosu = kosular[selectedIndex]
+                let kosu = kosular[selectedIndex]
+                
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("\(currentKosu.RACENO ?? "0"). Koşu").font(.title3.bold())
+                        Text("\(kosu.RACENO ?? "0"). Koşu")
+                            .font(.title3.bold())
+                        
                         Spacer()
-                        Label(currentKosu.SAAT ?? "00:00", systemImage: "clock.badge").bold()
+                        
+                        Label(
+                            kosu.SAAT ?? "00:00",
+                            systemImage: "clock.fill"
+                        )
+                        .font(.subheadline.bold())
                     }
-                    Text(currentKosu.BILGI_TR ?? "")
+                    
+                    Text(kosu.BILGI_TR ?? "")
                         .font(.subheadline)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding()
-                .background(.ultraThinMaterial)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
             }
         }
     }
     
-    // Alt Koşu Seçici (Hızlı Geçiş)
-    var footerKosuSecici: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 4) {
-                ForEach(kosular.indices, id: \.self) { index in
-                    Button {
-                        withAnimation(.spring()) { selectedIndex = index }
-                    } label: {
-                        Text(kosular[index].RACENO ?? "0")
-                            .font(.system(size: 14, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 42)
-                            .background(selectedIndex == index ? Color.primary : Color.primary.opacity(0.1))
-                            .foregroundColor(selectedIndex == index ? Color(.systemBackground) : .primary)
-                            .cornerRadius(8)
+    // MARK: - KOŞU SEKMELERİ
+    private var kosuSekmeSecici: some View {
+        // ScrollView kaldırıldı, yerine ekrana yayılan HStack geldi
+        HStack(spacing: 6) {
+            ForEach(kosular.indices, id: \.self) { index in
+                let kosuNo = kosular[index].RACENO ?? "\(index + 1)"
+                let buttonColors = getPistColors(for: index)
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selectedIndex = index
+                    }
+                } label: {
+                    Text(kosuNo)
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity) // 👈 SİHİRLİ DOKUNUŞ: Ekranı eşit böler
+                        .frame(height: 36) // Yüksekliği biraz azalttık ki daha zarif dursun
+                        .background(
+                            Group {
+                                if selectedIndex == index {
+                                    // Seçili buton: Pist renginde canlı gradyan
+                                    LinearGradient(
+                                        colors: buttonColors,
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                } else {
+                                    // Seçili olmayan buton: Daha sönük ve koyu pist rengi
+                                    LinearGradient(
+                                        colors: buttonColors.map { $0.opacity(0.2) },
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                }
+                            }
+                        )
+                        .foregroundColor(selectedIndex == index ? .black : .white)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(selectedIndex == index ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, 10) // Kenar boşlukları
+        .padding(.vertical, 10)
+        .id("KosuSecici_\(raceName)_\(kosular.count)")
+    }
+    
+    // MARK: - DATA FETCHING
+    private func fetchNewCityData(cityName: String) {
+        isRefreshing = true
+        selectedIndex = 0
+        
+        Task {
+            do {
+                let dateStr = apiDateFormatter.string(from: selectedDate)
+                let program = try await parser.getProgramData(raceDate: dateStr, cityName: cityName)
+                
+                // 1. Verileri arka planda hazırla (MainActor'u yormamak için)
+                var newHava: HavaData?
+                if let havaDict = program["hava"] as? [String: Any] {
+                    newHava = HavaData(from: havaDict)
+                }
+                
+                var newKosular: [Race] = []
+                if let kosularArray = program["kosular"] as? [[String: Any]] {
+                    let data = try JSONSerialization.data(withJSONObject: kosularArray)
+                    newKosular = try JSONDecoder().decode([Race].self, from: data)
+                }
+                
+                let newAgf = program["agf"] as? [[String: Any]] ?? []
+                
+                // 2. Arayüzü güncelle (Sadece UI ile ilgili olanları MainActor'da yap)
+                await MainActor.run {
+                    // Eğer newHava gelmişse güncelle, gelmemişse mevcut havaData'yı koru
+                    // veya unwrap hatasını önlemek için güvenli ata.
+                    if let safeHava = newHava {
+                        self.havaData = safeHava
+                    }
+                    
+                    self.kosular = newKosular
+                    self.agf = newAgf
+                    
+                    withAnimation {
+                        isRefreshing = false
                     }
                 }
+            } catch {
+                print("Veri çekme hatası: \(error)")
+                await MainActor.run {
+                    isRefreshing = false
+                }
             }
-            .padding(8)
-            .background(.ultraThinMaterial)
         }
+        
     }
 }
 
-// MARK: - Previews
-#Preview("Race Detail Görünümü") {
-    // Örnek bir HavaData oluşturuyoruz
-    let mockHava = HavaData(
-        aciklama: 0,
-        cimPistagirligi: 1,
-        cimEn: "Good",
-        cimTr: "Çim: Normal (3.3)",
-        gece: 0,
-        havaDurumIcon: "sun.max.fill",
-        havaEn: "Sunny",
-        havaTr: "Güneşli",
-        hipodromAdi: "Veliefendi Hipodromu",
-        hipodromYeri: "İstanbul",
-        kumPistagirligi: 1,
-        kumEn: "Normal",
-        kumTr: "Kum: Normal",
-        nem: 40,
-        sicaklik: 22
-    )
 
-    // Örnek bir Race listesi oluşturuyoruz (Race modelinizdeki init'e uygun)
-    // Not: JSON'dan gelmediği için manuel bir test verisi oluşturmak adına
-    // modelinize bir test init'i eklemek gerekebilir veya aşağıdaki gibi boş bir diziyle başlatılabilir.
-    
-    NavigationStack {
-        RaceDetailView(
-            raceName: "İstanbul",
-            havaData: mockHava,
-            kosular: mockRaces(), // Aşağıdaki yardımcı fonksiyonu kullanır
-            agf: []
-        )
-    }
-}
-
-// Preview için test verisi üreten yardımcı fonksiyon
-func mockRaces() -> [Race] {
-    // Not: Race modeliniz Decodable olduğu için manuel init zordur.
-    // Preview için en sağlıklı yol JSON string'inden decode etmektir:
-    let json = """
-    [
-        {
-            "KOD": "IST1",
-            "RACENO": "1",
-            "SAAT": "14:00",
-            "PIST": "Çim",
-            "PISTADI_TR": "Çim Pist",
-            "MESAFE": "1900",
-            "BILGI_TR": "3 Yaşlı İngilizler, Handikap 15",
-            "ONEMLIKOSUADI_TR": false,
-            "ONEMLIKOSUADI_EN": false,
-            "OZELADI": false,
-            "APRANTI": false,
-            "hasSatisbedeli": false,
-            "hasNonRunner": false,
-            "atlar": []
-        },
-        {
-            "KOD": "IST2",
-            "RACENO": "2",
-            "SAAT": "14:30",
-            "PIST": "Kum",
-            "PISTADI_TR": "Kum Pist",
-            "MESAFE": "1400",
-            "BILGI_TR": "4+ Araplar, Şartlı 4",
-            "ONEMLIKOSUADI_TR": false,
-            "ONEMLIKOSUADI_EN": false,
-            "OZELADI": false,
-            "APRANTI": true,
-            "hasSatisbedeli": false,
-            "hasNonRunner": false,
-            "atlar": []
-        }
-    ]
-    """.data(using: .utf8)!
-    
-    return (try? JSONDecoder().decode([Race].self, from: json)) ?? []
-}

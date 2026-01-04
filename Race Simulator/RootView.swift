@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 
+// MARK: - APP DELEGATE
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock = UIInterfaceOrientationMask.portrait
 
@@ -9,6 +10,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+// MARK: - PARTICLE MODEL
 struct Particle: Identifiable {
     let id = UUID()
     let vx: CGFloat
@@ -16,6 +18,7 @@ struct Particle: Identifiable {
     let color: Color
 }
 
+// MARK: - EXPLOSION VIEW
 struct ExplosionView: View {
     @State private var particles: [Particle] = []
     @State private var opacity: Double = 1.0
@@ -50,7 +53,6 @@ struct ExplosionView: View {
         for _ in 0..<150 {
             let angle = Double.random(in: 0...(2 * .pi))
             let speed = CGFloat.random(in: 100...500)
-            
             let p = Particle(
                 vx: cos(angle) * speed,
                 vy: sin(angle) * speed,
@@ -61,6 +63,7 @@ struct ExplosionView: View {
     }
 }
 
+// MARK: - MATRIX EFFECTS
 struct Theme {
     static let matrixCyan = Color.cyan
 }
@@ -113,60 +116,65 @@ struct MatrixColumn: View {
     }
 }
 
-struct LoginView: View {
-    @Binding var isLoggedIn: Bool
+// MARK: - ROOT VIEW
+struct RootView: View {
+    @State private var isAppReady = false
     @State private var showExplosion = false
     @State private var logoOpacity: Double = 1.0
     @State private var logoScale: CGFloat = 1.0
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            if isAppReady {
+                MainShellView()
+                    .transition(.blurReplace)
+            } else {
+                ZStack {
+                    Color.black.ignoresSafeArea()
 
-            MatrixBackground()
-                .ignoresSafeArea()
-                .drawingGroup()
+                    MatrixBackground()
+                        .ignoresSafeArea()
+                        .drawingGroup()
 
-            VStack {
-                Spacer()
-                
-                Image("tayzekatransparent")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 400, height: 400)
-                    .foregroundColor(Theme.matrixCyan)
-                    .scaleEffect(logoScale)
-                    .opacity(logoOpacity)
-                    .shadow(color: Theme.matrixCyan.opacity(0.6), radius: 25)
-                
-                Spacer()
-                
-                
+                    VStack {
+                        Spacer()
+                        Image("tayzekatransparent")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 400, height: 400)
+                            .foregroundColor(Theme.matrixCyan)
+                            .scaleEffect(logoScale)
+                            .opacity(logoOpacity)
+                            .shadow(color: Theme.matrixCyan.opacity(0.6), radius: 25)
+                        Spacer()
+                    }
+
+                    if showExplosion {
+                        ExplosionView()
+                    }
+                }
+                .onAppear {
+                    setupOrientation()
+                    startAutomaticProcess()
+                }
             }
-
-            if showExplosion {
-                ExplosionView()
-            }
-        }
-        .onAppear {
-            setupOrientation()
-            startAutomaticProcess()
         }
     }
 
     private func startAutomaticProcess() {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            
             withAnimation(.easeIn(duration: 0.4)) {
                 logoScale = 2.0
                 logoOpacity = 0
             }
-                        
+        
             showExplosion = true
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                withAnimation(.easeInOut(duration: 0.6)) {
-                    isLoggedIn = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    isAppReady = true
                 }
             }
         }
@@ -181,6 +189,7 @@ struct LoginView: View {
     }
 }
 
+// MARK: - PREVIEW
 #Preview {
-    LoginView(isLoggedIn: .constant(false))
+    RootView()
 }
