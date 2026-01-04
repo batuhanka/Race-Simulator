@@ -8,6 +8,9 @@ import SwiftUI
 
 // MARK: - CUSTOM BOTTOM BAR
 struct CustomBottomBar: View {
+    
+    @Binding var selectedBottomTab: Int
+    
     var body: some View {
         VStack(spacing: 0) {
 
@@ -20,13 +23,15 @@ struct CustomBottomBar: View {
                 BottomTabItem(
                     icon: "house.fill",
                     title: "Anasayfa",
-                    active: true
+                    active: selectedBottomTab == 0,
+                    action: { selectedBottomTab = 0 }
                 )
 
                 BottomTabItem(
                     icon: "list.bullet.rectangle",
                     title: "Program",
-                    active: false
+                    active: selectedBottomTab == 1,
+                    action: { selectedBottomTab = 1 }
                 )
 
                 VStack(spacing: 4) {
@@ -43,17 +48,20 @@ struct CustomBottomBar: View {
                 }
                 .frame(maxWidth: .infinity)
                 .offset(y: 0)
+                .onTapGesture { selectedBottomTab = 2 }
 
                 BottomTabItem(
                     icon: "flag.fill",
                     title: "Sonuçlar",
-                    active: false
+                    active: selectedBottomTab == 3,
+                    action: { selectedBottomTab = 3 }
                 )
 
                 BottomTabItem(
                     icon: "ticket.fill",
                     title: "Muhtemeller",
-                    active: false
+                    active: selectedBottomTab == 4,
+                    action: { selectedBottomTab = 4 }
                 )
             }
             .padding(.top, -30)
@@ -69,13 +77,18 @@ struct BottomTabItem: View {
     let icon: String
     let title: String
     let active: Bool
+    let action: () -> Void
 
     var body: some View {
-        Button(action: {}) {
+        Button(action: {
+            withAnimation(.easeInOut) {
+                action()
+            }
+        }) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-
+                
                 Text(title)
                     .font(.system(size: 10, weight: .bold))
             }
@@ -87,5 +100,5 @@ struct BottomTabItem: View {
 }
 
 #Preview {
-    CustomBottomBar()
+    CustomBottomBar(selectedBottomTab: .constant(1))
 }

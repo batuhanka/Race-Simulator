@@ -10,6 +10,9 @@ struct RaceDetailView: View {
     let allRaces: [String]
     let selectedDate: Date
     
+    // MARK: Binding
+    @Binding var selectedBottomTab: Int
+    
     @State private var selectedIndex: Int = 0
     @State private var isRefreshing: Bool = false
     
@@ -104,6 +107,9 @@ struct RaceDetailView: View {
         .onChange(of: raceName) { oldValue, newValue in
             fetchNewCityData(cityName: newValue)
         }
+        .onAppear() {
+            selectedBottomTab = 1
+        }
     }
     
     // MARK: - DROPDOWN MENU
@@ -185,19 +191,19 @@ struct RaceDetailView: View {
                 } label: {
                     Text(kosuNo)
                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity) // 👈 SİHİRLİ DOKUNUŞ: Ekranı eşit böler
-                        .frame(height: 36) // Yüksekliği biraz azalttık ki daha zarif dursun
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
                         .background(
                             Group {
                                 if selectedIndex == index {
-                                    // Seçili buton: Pist renginde canlı gradyan
+                                    
                                     LinearGradient(
                                         colors: buttonColors,
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )
                                 } else {
-                                    // Seçili olmayan buton: Daha sönük ve koyu pist rengi
+                                    
                                     LinearGradient(
                                         colors: buttonColors.map { $0.opacity(0.2) },
                                         startPoint: .top,
@@ -230,7 +236,6 @@ struct RaceDetailView: View {
                 let dateStr = apiDateFormatter.string(from: selectedDate)
                 let program = try await parser.getProgramData(raceDate: dateStr, cityName: cityName)
                 
-                // 1. Verileri arka planda hazırla (MainActor'u yormamak için)
                 var newHava: HavaData?
                 if let havaDict = program["hava"] as? [String: Any] {
                     newHava = HavaData(from: havaDict)
@@ -244,10 +249,7 @@ struct RaceDetailView: View {
                 
                 let newAgf = program["agf"] as? [[String: Any]] ?? []
                 
-                // 2. Arayüzü güncelle (Sadece UI ile ilgili olanları MainActor'da yap)
                 await MainActor.run {
-                    // Eğer newHava gelmişse güncelle, gelmemişse mevcut havaData'yı koru
-                    // veya unwrap hatasını önlemek için güvenli ata.
                     if let safeHava = newHava {
                         self.havaData = safeHava
                     }

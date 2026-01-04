@@ -12,19 +12,21 @@ struct CardPressEffectStyle: ButtonStyle {
 
 // MARK: - Race Card Button
 struct RaceCardButton: View {
+    
     let raceName: String
+    var action: (() -> Void)? = nil
     @Binding var selectedRace: String?
     @Binding var selectedDate: Date
     @Binding var showRaceDetails: Bool
     @Binding var havaData: HavaData?
     @Binding var kosular: [Race]
     @Binding var agf: [[String: Any]]
-
+    
     let parser: JsonParser
     let dateFormatter: DateFormatter
-
+    
     @State private var isFetching: Bool = false
-
+    
     // MARK: - Otomatik Görsel İsimlendirme
     private func getBackgroundImageName() -> String {
         // Küçük harfe çevir (Türkçe karakter duyarlı: İ -> i)
@@ -42,9 +44,15 @@ struct RaceCardButton: View {
         // "istanbul" -> "istanbulhipodrom"
         return name + "hipodrom"
     }
-
+    
     var body: some View {
-        Button(action: fetchRaceDetails) {
+        Button(action: {
+            if let customAction = action {
+                customAction()
+            } else {
+                fetchRaceDetails()
+            }
+        }) {
             ZStack {
                 // 1. Arka Plan Resmi
                 Image(getBackgroundImageName())
@@ -63,7 +71,7 @@ struct RaceCardButton: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-
+                
                 // 3. İçerik
                 HStack(spacing: 15) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -101,7 +109,7 @@ struct RaceCardButton: View {
         .buttonStyle(CardPressEffectStyle())
         .disabled(isFetching)
     }
-
+    
     private func fetchRaceDetails() {
         isFetching = true
         Task {
