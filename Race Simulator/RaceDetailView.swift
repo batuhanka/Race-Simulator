@@ -6,9 +6,13 @@ struct RaceDetailView: View {
     @State var havaData: HavaData
     @State var kosular: [Race]
     @State var agf: [[String: Any]]
+    @State private var currentRaceResult: RaceResult? = nil
     
     let allRaces: [String]
     let selectedDate: Date
+    
+    @State private var fetchTask: Task<Void, Never>? = nil
+    @State private var isFetchingResults: Bool = false
     
     // MARK: Binding
     @Binding var selectedBottomTab: Int
@@ -23,25 +27,6 @@ struct RaceDetailView: View {
         return f
     }()
     
-    // MARK: - PİST RENKLERİ
-    private func getPistColors(for index: Int) -> [Color] {
-        guard kosular.indices.contains(index) else {
-            return [Color.black, Color.black]
-        }
-        
-        let pist = (kosular[index].PIST ?? "").lowercased(with: Locale(identifier: "tr_TR"))
-        
-        if pist.contains("cim") || pist.contains("çim") {
-            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
-        } else if pist.contains("kum") {
-            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
-        } else if pist.contains("sentetik") {
-            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
-        } else {
-            return [Color.gray.opacity(0.3), Color.black.opacity(0.9)]
-        }
-    }
-    
     // MARK: - BODY
     var body: some View {
         VStack(spacing: 0) {
@@ -50,42 +35,46 @@ struct RaceDetailView: View {
             kosuSekmeSecici
             
             if isRefreshing {
-                VStack {
-                    Spacer()
-                    ProgressView()
-                        .tint(.cyan)
-                        .scaleEffect(1.5)
-                    Text("Veriler Güncelleniyor...")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.top)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
+                loadingView
             } else {
                 if kosular.indices.contains(selectedIndex) {
-                    List {
-                        let seciliKosu = kosular[selectedIndex]
+                    let seciliKosu = kosular[selectedIndex]
+                    
+                    // Logic Switch: Results vs Program
+                    if let results = currentRaceResult,
+                       let finishers = results.SONUCLAR,
+                       !finishers.isEmpty,
+                       results.KOD == seciliKosu.KOD { // Kritik kontrol: Gelen veri gerçekten bu koşuya mı ait?
                         
-                        if let atlar = seciliKosu.atlar, !atlar.isEmpty {
-                            ForEach(atlar) { at in
-                                ListItemView(at: at)
+                        // --- RESULTS VIEW ---
+                        ScrollView {
+                            LazyVStack(spacing: 8) {
+                                ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
+                                    ResultRowView(finisher: finisher)
+                                }
+                                Color.clear.frame(height: 65)
                             }
-                            
-                            Color.clear
-                                .frame(height: 40)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        } else {
-                            ContentUnavailableView(
-                                "At Bilgisi Yok",
-                                systemImage: "horse.fill"
-                            )
+                            .padding(.horizontal)
                         }
+                        .id("Results_\(seciliKosu.KOD)")
+                    } else if isFetchingResults {
+                        loadingView
+                    } else {
+                        List {
+                            if let atlar = seciliKosu.atlar, !atlar.isEmpty {
+                                ForEach(atlar) { at in
+                                    ListItemView(at: at)
+                                }
+                                Color.clear.frame(height: 50)
+                            } else {
+                                ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
+                            }
+                        }
+                        .id("ProgramList_\(selectedIndex)")
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .transition(.opacity)
                     }
-                    .id("List_\(raceName)_\(selectedIndex)") // Şehir veya Koşu değişince List'i sıfırla
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
             }
         }
@@ -109,17 +98,97 @@ struct RaceDetailView: View {
         }
         .onAppear() {
             selectedBottomTab = 1
+            if kosular.indices.contains(selectedIndex) {
+                checkResults(for: kosular[selectedIndex])
+            }
+            let seciliKosu = kosular[selectedIndex]
+            logRaceDetails(race: seciliKosu, date: selectedDate, city: raceName)
+            
+        }
+    }
+}
+
+// MARK: - SUBVIEWS
+extension RaceDetailView {
+    
+    private var loadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+                .tint(.cyan)
+                .scaleEffect(1.5)
+            Text("Veriler Güncelleniyor...")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.top)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    private var headerBilgiAlani: some View {
+        Group {
+            if kosular.indices.contains(selectedIndex) {
+                let kosu = kosular[selectedIndex]
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("\(kosu.RACENO ?? "0"). Koşu")
+                            .font(.title3.bold())
+                        Spacer()
+                        Label(kosu.SAAT ?? "00:00", systemImage: "clock.fill")
+                            .font(.subheadline.bold())
+                    }
+                    
+                    Text(kosu.BILGI_TR ?? "")
+                        .font(.subheadline)
+                        .lineLimit(2, reservesSpace: true) // 3 satırlık yeri hep ayırır
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .frame(height: 80, alignment: .top)
+            }
         }
     }
     
-    // MARK: - DROPDOWN MENU
+    private var kosuSekmeSecici: some View {
+        HStack(spacing: 6) {
+            ForEach(kosular.indices, id: \.self) { index in
+                let kosuNo = kosular[index].RACENO ?? "\(index + 1)"
+                let buttonColors = getPistColors(for: index)
+                Button {
+                    selectedIndex = index
+                    currentRaceResult = nil
+                    checkResults(for: kosular[index])
+                } label: {
+                    Text(kosuNo)
+                        .font(.system(size: 13, weight: .bold)) // Biraz büyüttük
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38)
+                        .background(
+                            selectedIndex == index ?
+                            LinearGradient(colors: buttonColors, startPoint: .top, endPoint: .bottom) :
+                                LinearGradient(colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                        )
+                        .foregroundColor(selectedIndex == index ? .black : .white.opacity(0.7))
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .animation(.easeInOut(duration: 0.2), value: selectedIndex)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+    }
+    
     private var dropdownTitleMenu: some View {
+        
         Menu {
             ForEach(allRaces, id: \.self) { city in
                 Button {
-                    withAnimation {
-                        self.raceName = city
-                    }
+                    withAnimation { self.raceName = city }
                 } label: {
                     HStack {
                         Text(city)
@@ -134,9 +203,7 @@ struct RaceDetailView: View {
                 Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                
                 Image(systemName: "chevron.down.circle.fill")
-                    .font(.subheadline)
                     .foregroundColor(.cyan)
             }
             .padding(.horizontal, 12)
@@ -144,102 +211,67 @@ struct RaceDetailView: View {
             .background(Capsule().fill(Color.black.opacity(0.2)))
         }
     }
+}
+
+// MARK: - LOGIC & HELPERS
+extension RaceDetailView {
     
-    // MARK: - ÜST BİLGİ PANELİ
-    private var headerBilgiAlani: some View {
-        Group {
-            if kosular.indices.contains(selectedIndex) {
-                let kosu = kosular[selectedIndex]
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("\(kosu.RACENO ?? "0"). Koşu")
-                            .font(.title3.bold())
-                        
-                        Spacer()
-                        
-                        Label(
-                            kosu.SAAT ?? "00:00",
-                            systemImage: "clock.fill"
-                        )
-                        .font(.subheadline.bold())
-                    }
+    private func getPistColors(for index: Int) -> [Color] {
+        guard kosular.indices.contains(index) else { return [.black, .black] }
+        let pist = (kosular[index].PIST ?? "").lowercased(with: Locale(identifier: "tr_TR"))
+        if pist.contains("cim") || pist.contains("çim") {
+            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
+        } else if pist.contains("kum") {
+            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
+        } else if pist.contains("sentetik") {
+            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
+        } else {
+            return [Color.gray.opacity(0.3), Color.black.opacity(0.9)]
+        }
+    }
+    
+    private func checkResults(for race: Race) {
+        
+        fetchTask?.cancel()
+            
+            isFetchingResults = true
+            currentRaceResult = nil
+            
+            let dateStr = apiDateFormatter.string(from: selectedDate)
+            
+            fetchTask = Task {
+                do {
+                    let result = try await parser.getRaceResult(raceDate: dateStr, cityName: raceName, targetKod: race.KOD)
                     
-                    Text(kosu.BILGI_TR ?? "")
-                        .font(.subheadline)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal)
-                .padding(.vertical, 12)
-            }
-        }
-    }
-    
-    // MARK: - KOŞU SEKMELERİ
-    private var kosuSekmeSecici: some View {
-        // ScrollView kaldırıldı, yerine ekrana yayılan HStack geldi
-        HStack(spacing: 6) {
-            ForEach(kosular.indices, id: \.self) { index in
-                let kosuNo = kosular[index].RACENO ?? "\(index + 1)"
-                let buttonColors = getPistColors(for: index)
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selectedIndex = index
+                    try Task.checkCancellation()
+                    
+                    await MainActor.run {
+                        self.currentRaceResult = result
+                        self.isFetchingResults = false // Yükleme bitti
                     }
-                } label: {
-                    Text(kosuNo)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
-                        .background(
-                            Group {
-                                if selectedIndex == index {
-                                    
-                                    LinearGradient(
-                                        colors: buttonColors,
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                } else {
-                                    
-                                    LinearGradient(
-                                        colors: buttonColors.map { $0.opacity(0.2) },
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                }
-                            }
-                        )
-                        .foregroundColor(selectedIndex == index ? .black : .white)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(selectedIndex == index ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
-                        )
+                } catch {
+                    await MainActor.run { self.isFetchingResults = false }
                 }
             }
-        }
-        .padding(.horizontal, 10) // Kenar boşlukları
-        .padding(.vertical, 10)
-        .id("KosuSecici_\(raceName)_\(kosular.count)")
     }
     
-    // MARK: - DATA FETCHING
+    private func logRaceDetails(race: Race, date: Date, city: String) {
+        // Simple console logging to avoid View return errors
+        print("DEBUG: Checking \(city) - KOD: \(race.KOD)")
+    }
+    
     private func fetchNewCityData(cityName: String) {
         isRefreshing = true
         selectedIndex = 0
-        
+        currentRaceResult = nil
         Task {
             do {
                 let dateStr = apiDateFormatter.string(from: selectedDate)
                 let program = try await parser.getProgramData(raceDate: dateStr, cityName: cityName)
                 
+                // Parse Logic...
                 var newHava: HavaData?
-                if let havaDict = program["hava"] as? [String: Any] {
-                    newHava = HavaData(from: havaDict)
-                }
+                if let havaDict = program["hava"] as? [String: Any] { newHava = HavaData(from: havaDict) }
                 
                 var newKosular: [Race] = []
                 if let kosularArray = program["kosular"] as? [[String: Any]] {
@@ -250,25 +282,17 @@ struct RaceDetailView: View {
                 let newAgf = program["agf"] as? [[String: Any]] ?? []
                 
                 await MainActor.run {
-                    if let safeHava = newHava {
-                        self.havaData = safeHava
-                    }
-                    
+                    if let safeHava = newHava { self.havaData = safeHava }
                     self.kosular = newKosular
                     self.agf = newAgf
-                    
-                    withAnimation {
-                        isRefreshing = false
-                    }
+                    withAnimation { isRefreshing = false }
+                    // Trigger check for first race of new city
+                    if !newKosular.isEmpty { checkResults(for: newKosular[0]) }
                 }
             } catch {
-                print("Veri çekme hatası: \(error)")
-                await MainActor.run {
-                    isRefreshing = false
-                }
+                await MainActor.run { isRefreshing = false }
             }
         }
-        
     }
 }
 

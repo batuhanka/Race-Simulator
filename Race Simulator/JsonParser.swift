@@ -34,6 +34,38 @@ class JsonParser {
         return jsonDict
     }
     
+    
+    func getRaceResult(raceDate: String, cityName: String, targetKod: String) async throws -> RaceResult? {
+        // 1. Sanitize the city name (Aynı kalıyor)
+        let sanitized = cityName
+            .replacingOccurrences(of: "ğ", with: "g")
+            .replacingOccurrences(of: "ü", with: "u")
+            .replacingOccurrences(of: "ş", with: "s")
+            .replacingOccurrences(of: "ı", with: "i")
+            .replacingOccurrences(of: "ö", with: "o")
+            .replacingOccurrences(of: "ç", with: "c")
+        
+        let uppercaseCity = sanitized.uppercased(with: Locale(identifier: "tr_TR"))
+
+        let urlString = "https://ebayi.tjk.org/s/d/sonuclar/\(raceDate)/full/\(uppercaseCity).json"
+        guard let url = URL(string: urlString) else { return nil }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        
+        guard let jsonObject = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) as? [String: Any],
+              let kosularArray = jsonObject["kosular"] as? [[String: Any]] else {
+            return nil
+        }
+        
+        if let targetDict = kosularArray.first(where: { "\($0["KOD"] ?? "")" == targetKod }) {
+            let resultData = try JSONSerialization.data(withJSONObject: targetDict, options: [])
+            let decoder = JSONDecoder()
+            return try decoder.decode(RaceResult.self, from: resultData)
+        }
+        
+        return nil
+    }
+    
 }
 
 

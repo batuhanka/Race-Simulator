@@ -78,3 +78,4 @@ extension HavaData {
         self.sicaklik = sicaklik
     }
 }
+

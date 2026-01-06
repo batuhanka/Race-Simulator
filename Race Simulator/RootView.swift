@@ -4,7 +4,7 @@ import UIKit
 // MARK: - APP DELEGATE
 class AppDelegate: NSObject, UIApplicationDelegate {
     static var orientationLock = UIInterfaceOrientationMask.portrait
-
+    
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         return AppDelegate.orientationLock
     }
@@ -22,35 +22,45 @@ struct Particle: Identifiable {
 struct ExplosionView: View {
     @State private var particles: [Particle] = []
     @State private var opacity: Double = 1.0
+    // Hepsinin aynı noktada başlaması için tam 0.0 değerini kullanıyoruz
     @State private var animationProgress: CGFloat = 0.0
-
+    @State private var isVisible: Bool = false
+    
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                ForEach(particles) { particle in
-                    Text(String("01".randomElement()!))
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(particle.color)
-                        .position(
-                            x: (geo.size.width / 2) + (particle.vx * animationProgress),
-                            y: (geo.size.height / 2) + (particle.vy * animationProgress)
-                        )
-                        .opacity(opacity)
+                if isVisible {
+                    ForEach(particles) { particle in
+                        Text(String("01".randomElement()!))
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundColor(particle.color)
+                            .position(
+                                // Hepsi aynı (0,0) ofsetinden başlıyor
+                                x: (geo.size.width / 2) + (particle.vx * animationProgress),
+                                y: (geo.size.height / 2) + (particle.vy * animationProgress)
+                            )
+                            .opacity(opacity)
+                    }
                 }
             }
             .onAppear {
                 createExplosion()
-                withAnimation(.easeOut(duration: 1.2)) {
-                    animationProgress = 1.0
-                    opacity = 0
+                // Milisaniyelik gecikme ile görünür kılıp patlatıyoruz
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                    isVisible = true
+                    withAnimation(.easeOut(duration: 1.2)) {
+                        animationProgress = 1.0
+                        opacity = 0
+                    }
                 }
             }
         }
         .ignoresSafeArea()
     }
-
+    
     func createExplosion() {
-        for _ in 0..<150 {
+        var tempParticles: [Particle] = []
+        for _ in 0..<200 {
             let angle = Double.random(in: 0...(2 * .pi))
             let speed = CGFloat.random(in: 100...500)
             let p = Particle(
@@ -58,8 +68,9 @@ struct ExplosionView: View {
                 vy: sin(angle) * speed,
                 color: .cyan
             )
-            particles.append(p)
+            tempParticles.append(p)
         }
+        self.particles = tempParticles
     }
 }
 
@@ -95,7 +106,7 @@ struct MatrixColumn: View {
     private let duration: Double = Double.random(in: 6...12)
     private let delay: Double = Double.random(in: 0...2)
     private let initialRandomOffset: CGFloat = CGFloat.random(in: -800...(-400))
-
+    
     var body: some View {
         VStack(spacing: 10) {
             ForEach(0..<50, id: \.self) { _ in
@@ -127,15 +138,15 @@ struct RootView: View {
         ZStack {
             if isAppReady {
                 MainShellView()
-                    .transition(.blurReplace)
+                    .transition(.opacity)
             } else {
                 ZStack {
                     Color.black.ignoresSafeArea()
-
+                    
                     MatrixBackground()
                         .ignoresSafeArea()
                         .drawingGroup()
-
+                    
                     VStack {
                         Spacer()
                         Image("tayzekatransparent")
@@ -148,7 +159,7 @@ struct RootView: View {
                             .shadow(color: Theme.matrixCyan.opacity(0.6), radius: 25)
                         Spacer()
                     }
-
+                    
                     if showExplosion {
                         ExplosionView()
                     }
@@ -160,26 +171,26 @@ struct RootView: View {
             }
         }
     }
-
+    
     private func startAutomaticProcess() {
-        
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            
             withAnimation(.easeIn(duration: 0.4)) {
                 logoScale = 2.0
                 logoOpacity = 0
             }
-        
+            
             showExplosion = true
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            // Patlama biterken görünümü tamamen hiyerarşiden çıkarıyoruz
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     isAppReady = true
+                    showExplosion = false // Bu satır merkezdeki kalıntıyı yok eder
                 }
             }
         }
     }
-
+    
     private func setupOrientation() {
         AppDelegate.orientationLock = .portrait
         UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
