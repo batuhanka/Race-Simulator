@@ -60,32 +60,52 @@ struct RaceDetailView: View {
                     } else if isFetchingResults {
                         loadingView
                     } else {
-                        List {
-                            if let atlar = seciliKosu.atlar, !atlar.isEmpty {
-                                ForEach(atlar) { at in
-                                    ListItemView(at: at)
+                        ScrollView {
+                            LazyVStack(spacing: 4) { // Kartlar arasındaki dikey boşluk
+                                if let atlar = seciliKosu.atlar, !atlar.isEmpty {
+                                    ForEach(atlar) { at in
+                                        ListItemView(at: at)
+                                            .padding(.horizontal) // Kartları ekran kenarından iter
+                                    }
+                                    
+                                    Color.clear.frame(height: 70)
+                                } else {
+                                    ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
                                 }
-                                Color.clear.frame(height: 50)
-                            } else {
-                                ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
                             }
                         }
                         .id("ProgramList_\(selectedIndex)")
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
                         .transition(.opacity)
                     }
                 }
             }
         }
         .background(
-            RadialGradient(
-                gradient: Gradient(colors: [Color.black.opacity(0.9), Color.clear]),
-                center: .top,
-                startRadius: 0,
-                endRadius: 1200
-            )
-            .ignoresSafeArea()
+            ZStack {
+                // 1. Temel arka plan rengi (Koyu bir zemin üzerine renk bindireceğiz)
+                Color.black.ignoresSafeArea()
+                
+                // 2. Dinamik Pist Rengi
+                let pistRenkleri = getPistColors(for: selectedIndex)
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        pistRenkleri.last?.opacity(0.6) ?? .black, // Pistin ana rengi (üstten)
+                        Color.black.opacity(0.8)                 // Siyaha doğru geçiş
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.6), value: selectedIndex) // Renk geçişini yumuşatır
+                
+                // 3. Hafif bir doku (Opsiyonel: Daha derinlikli durması için)
+                RadialGradient(
+                    gradient: Gradient(colors: [.clear, .black.opacity(0.4)]),
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 1000
+                ).ignoresSafeArea()
+            }
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

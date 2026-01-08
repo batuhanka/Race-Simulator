@@ -6,82 +6,59 @@ struct ResultRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             
-            // ÜST SATIR: No, Forma, At Adı ve Jokey/Derece
             HStack(alignment: .center, spacing: 4) {
                 
-                // At Numarası
                 Text(finisher.NO ?? "")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .font(.title)
+                    .fontWeight(.heavy)
                     .foregroundColor(.primary)
-                    //.frame(width: 35) // Numaraların hizalı durması için sabitleyebiliriz
                 
-                // Forma
                 jerseyImage
                 
-                // At ve Jokey Bilgisi
                 VStack(alignment: .leading, spacing: 2) {
                     Text(finisher.AD ?? "")
                         .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
+                        .fontWeight(.medium)
+                        .foregroundColor(finisher.KOSMAZ == true ? .red : .primary)
+                        .strikethrough(finisher.KOSMAZ == true, color: .red)
                     
-                    Text(finisher.JOKEYADI ?? "-")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
                 
-                // Sağ Taraf: Derece ve Ganyan
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(finisher.DERECE ?? "-")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(.cyan)
+                    
+                    Spacer()
+                    
+                    Text(finisher.JOKEYADI ?? "")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
                     
                     if let ganyan = finisher.GANYAN, ganyan != "0", !ganyan.isEmpty {
-                        Text("\(ganyan) TL")
-                            .font(.caption2)
-                            .fontWeight(.bold)
+                        Text("\(ganyan)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.12))
                             .foregroundColor(.green)
+                            .cornerRadius(4)
                     }
                 }
             }
             
-            Divider().opacity(0.3)
             
-            // ALT SATIR: Detay Bilgiler (Kilo, Start, Takı, Antrenör, Fark)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    // Kilo, Start ve Takı
-                    HStack(spacing: 6) {
-                        Label("\(Int(finisher.KILO ?? 0))kg", systemImage: "scalemass")
-                        Text("•")
-                        Text("St: \(finisher.START ?? "-")")
-                        if let taki = finisher.TAKI, !taki.isEmpty {
-                            Text("•")
-                            Text(taki)
-                        }
-                    }
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    // Antrenör Bilgisi
-                    Text(finisher.ANTRENORADI ?? "")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+             VStack(alignment: .leading, spacing: 4) {
                 
                 HStack {
-                    // Sahip Bilgisi
+                    
                     Text(finisher.SAHIPADI ?? "")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary.opacity(0.8))
+                        .font(.caption2)
                     
                     Spacer()
                     
-                    // Yarış Sonu Farkı (Vurgulu)
                     if let fark = finisher.FARK, !fark.isEmpty {
                         Text(fark)
                             .font(.system(size: 10, weight: .semibold))
@@ -91,12 +68,23 @@ struct ResultRowView: View {
                             .foregroundColor(.orange)
                             .cornerRadius(4)
                     }
+                    
+                    
+                    Text(finisher.DERECE ?? "-")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.cyan.opacity(0.12))
+                        .foregroundColor(.cyan)
+                        .cornerRadius(4)
                 }
             }
         }
-        .padding(.all, 5)
-        .background(Color(.secondarySystemBackground).opacity(0.4))
-        .cornerRadius(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
     }
     
     // MARK: - Jersey Image Component
@@ -106,14 +94,16 @@ struct ResultRowView: View {
             case .success(let image):
                 image.resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
-            case .failure, .empty:
+                    .overlay(Circle().stroke(Color.gray.opacity(0.5), lineWidth: 1))
+            case .failure:
                 Image(systemName: "person.circle.fill")
                     .resizable()
-                    .frame(width: 32, height: 32)
-                    .foregroundColor(.gray.opacity(0.5))
+                    .frame(width: 30, height: 30)
+                    .foregroundColor(.gray)
+            case .empty:
+                ProgressView().frame(width: 30, height: 30)
             @unknown default:
                 EmptyView()
             }
@@ -172,22 +162,22 @@ struct ResultRowView: View {
 // MARK: - Mock Helper
 extension HorseResult {
     static func mock(
-        no: String,
-        ad: String,
-        jokey: String,
-        derece: String,
-        ganyan: String,
-        kilo: Double,
-        start: String,
-        fark: String,
-        taki: String
+        no: String = "1",
+        ad: String = "HORSE NAME",
+        jokey: String = "JOCKEY",
+        derece: String = "1",
+        ganyan: String = "10.50",
+        kilo: Double = 55.0,
+        start: String = "10:00",
+        fark: String = "0",
+        taki: String = "TAKİ"
     ) -> HorseResult {
-        return HorseResult(
+        HorseResult(
             KEY: UUID().uuidString,
             AD: ad,
             NO: no,
             JOKEYADI: jokey,
-            SONUC: no, // Sonuç genelde numara ile eşleşir
+            SONUC: no,
             DERECE: derece,
             GANYAN: ganyan,
             FARK: fark,
@@ -196,7 +186,8 @@ extension HorseResult {
             ANTRENORADI: "M.AKSOY",
             SAHIPADI: "ALİ VELİ",
             FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg",
-            TAKI: taki
+            TAKI: taki,
+            KOSMAZ: false
         )
     }
 }

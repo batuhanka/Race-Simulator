@@ -28,6 +28,7 @@ private func parseSonYaris(_ veri: String) -> some View {
 struct ListItemView: View {
     let at: Horse
     
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             
@@ -44,7 +45,8 @@ struct ListItemView: View {
                     Text(at.AD ?? "")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                        .foregroundColor(at.KOSMAZ == true ? .red : .primary)
+                        .strikethrough(at.KOSMAZ == true, color: .red)
                 }
                 
                 Spacer()
@@ -116,8 +118,17 @@ struct ListItemView: View {
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
         .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .opacity(at.KOSMAZ == true ? 0.5 : 1.0)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground).opacity(0.7)) 
+                .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 3)
+        )
+        
     }
     
     private var jerseyImage: some View {
@@ -142,6 +153,9 @@ struct ListItemView: View {
         }
     }
 }
+
+
+
 #Preview {
     ListItemView(at: .example)
 }

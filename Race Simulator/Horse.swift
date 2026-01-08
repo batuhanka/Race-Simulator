@@ -173,6 +173,7 @@ extension Horse {
         YAS: "4y k a",
         KILO: 58,
         JOKEYADI: "ÖMER FARUK ÖZEN",
-        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
+        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg",
+        KOSMAZ: true
     )
 }
