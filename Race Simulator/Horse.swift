@@ -20,7 +20,7 @@ struct Horse: Identifiable, Codable {
     let START: String?
     let YAS: String?
     let YAS_EN: String?
-    let KILO: Int?
+    let KILO: Double?
     let FAZLAKILO: Int?
     let APRANTIKILOINDIRIMI: Int?
     let FARK: String?
@@ -43,7 +43,8 @@ struct Horse: Identifiable, Codable {
     let FORMA: String?
     let SON20: String?
     let KOSMAZ: Bool?
-    let EKURI: Bool?
+    let APRANTIFLG: Bool?
+    let EKURI: String?
     let TAKI: String?
     let AGF1: String?
     let AGFSIRA1: Int?
@@ -69,7 +70,7 @@ struct Horse: Identifiable, Codable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case KOD, KEY, NO, SONUC, AD, ADKUCUK, START, YAS, YAS_EN, KILO, FAZLAKILO, APRANTIKILOINDIRIMI, FARK, GECCIKIS_BOY, DERECE, GANYAN, BABA, ANNE, ANNEBABA, JOKEYADI, SAHIPADI, ANTRENORADI, BABAKODU, ANNEKODU, JOKEYKODU, SAHIPKODU, ANTRENORKODU, HANDIKAP, KGS, FORMA, SON20, KOSMAZ, EKURI, TAKI, AGF1, AGFSIRA1, AGF2, AGFSIRA2, ENIYIDERECE, ENIYIDERECEACIKLAMA, YETISTIRICI, YETISTIRICIADI, SATISBEDELI, SON6, SON6HTML, SON6_ARR, TAKI_ARR
+        case KOD, KEY, NO, SONUC, AD, ADKUCUK, START, YAS, YAS_EN, KILO, FAZLAKILO, APRANTIKILOINDIRIMI, FARK, GECCIKIS_BOY, DERECE, GANYAN, BABA, ANNE, ANNEBABA, JOKEYADI, SAHIPADI, ANTRENORADI, BABAKODU, ANNEKODU, JOKEYKODU, SAHIPKODU, ANTRENORKODU, HANDIKAP, KGS, FORMA, SON20, KOSMAZ, APRANTIFLG, EKURI, TAKI, AGF1, AGFSIRA1, AGF2, AGFSIRA2, ENIYIDERECE, ENIYIDERECEACIKLAMA, YETISTIRICI, YETISTIRICIADI, SATISBEDELI, SON6, SON6HTML, SON6_ARR, TAKI_ARR
     }
     
     init(from decoder: Decoder) throws {
@@ -84,7 +85,7 @@ struct Horse: Identifiable, Codable {
         START = try? container.decode(String.self, forKey: .START)
         YAS = try? container.decode(String.self, forKey: .YAS)
         YAS_EN = try? container.decode(String.self, forKey: .YAS_EN)
-        KILO = try? container.decode(Int.self, forKey: .KILO)
+        KILO = try? container.decode(Double.self, forKey: .KILO)
         FAZLAKILO = try? container.decode(Int.self, forKey: .FAZLAKILO)
         APRANTIKILOINDIRIMI = try? container.decode(Int.self, forKey: .APRANTIKILOINDIRIMI)
         FARK = try? container.decode(String.self, forKey: .FARK)
@@ -108,7 +109,14 @@ struct Horse: Identifiable, Codable {
         self.FORMA = rawForma?.replacingOccurrences(of: "http://medya.tjk.org", with: "https://medya-cdn.tjk.org")
         SON20 = try? container.decode(String.self, forKey: .SON20)
         KOSMAZ = try? container.decode(Bool.self, forKey: .KOSMAZ)
-        EKURI = try? container.decode(Bool.self, forKey: .EKURI)
+        APRANTIFLG = try? container.decode(Bool.self, forKey: .APRANTIFLG)
+        if let boolValue = try? container.decode(Bool.self, forKey: .EKURI) {
+            EKURI = boolValue ? nil : "false"
+        } else if let stringValue = try? container.decode(String.self, forKey: .EKURI) {
+            EKURI = stringValue
+        } else {
+            EKURI = nil
+        }
         TAKI = try? container.decode(String.self, forKey: .TAKI)
         AGF1 = try? container.decode(String.self, forKey: .AGF1)
         AGFSIRA1 = try? container.decode(Int.self, forKey: .AGFSIRA1)
@@ -129,15 +137,15 @@ struct Horse: Identifiable, Codable {
     init(
         KOD: String? = nil, KEY: String? = nil, NO: String? = nil, SONUC: String? = nil,
         AD: String? = nil, ADKUCUK: String? = nil, START: String? = nil, YAS: String? = nil,
-        YAS_EN: String? = nil, KILO: Int? = nil, FAZLAKILO: Int? = nil,
+        YAS_EN: String? = nil, KILO: Double? = nil, FAZLAKILO: Int? = nil,
         APRANTIKILOINDIRIMI: Int? = nil, FARK: String? = nil, GECCIKIS_BOY: String? = nil,
         DERECE: String? = nil, GANYAN: String? = nil, BABA: String? = nil,
         ANNE: String? = nil, ANNEBABA: String? = nil, JOKEYADI: String? = nil,
         SAHIPADI: String? = nil, ANTRENORADI: String? = nil, BABAKODU: String? = nil,
         ANNEKODU: String? = nil, JOKEYKODU: String? = nil, SAHIPKODU: String? = nil,
         ANTRENORKODU: String? = nil, HANDIKAP: String? = nil, KGS: String? = nil,
-        FORMA: String? = nil, SON20: String? = nil, KOSMAZ: Bool? = nil,
-        EKURI: Bool? = nil, TAKI: String? = nil, AGF1: String? = nil, AGFSIRA1: Int? = nil, AGF2: String? = nil, AGFSIRA2: Int? = nil,
+        FORMA: String? = nil, SON20: String? = nil, KOSMAZ: Bool? = nil, APRANTIFLG: Bool? = nil,
+        EKURI: String? = nil, TAKI: String? = nil, AGF1: String? = nil, AGFSIRA1: Int? = nil, AGF2: String? = nil, AGFSIRA2: Int? = nil,
         ENIYIDERECE: String? = nil,
         ENIYIDERECEACIKLAMA: String? = nil, YETISTIRICI: String? = nil,
         YETISTIRICIADI: String? = nil, SATISBEDELI: String? = nil, SON6: String? = nil,
@@ -154,7 +162,10 @@ struct Horse: Identifiable, Codable {
         self.SAHIPKODU = SAHIPKODU; self.ANTRENORKODU = ANTRENORKODU
         self.HANDIKAP = HANDIKAP; self.KGS = KGS;
         self.FORMA = FORMA;
-        self.SON20 = SON20; self.KOSMAZ = KOSMAZ; self.EKURI = EKURI; self.TAKI = TAKI;
+        self.SON20 = SON20;
+        self.KOSMAZ = KOSMAZ;
+        self.APRANTIFLG = APRANTIFLG;
+        self.EKURI = EKURI; self.TAKI = TAKI;
         self.AGF1 = AGF1; self.AGFSIRA1 = AGFSIRA1; self.AGF2 = AGF2; self.AGFSIRA2 = AGFSIRA2;
         self.ENIYIDERECE = ENIYIDERECE; self.ENIYIDERECEACIKLAMA = ENIYIDERECEACIKLAMA
         self.YETISTIRICI = YETISTIRICI; self.YETISTIRICIADI = YETISTIRICIADI
@@ -171,9 +182,11 @@ extension Horse {
         NO: "1",
         AD: "ATEŞ GALİBİ",
         YAS: "4y k a",
-        KILO: 58,
+        KILO: 58.5,
         JOKEYADI: "ÖMER FARUK ÖZEN",
         FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg",
-        KOSMAZ: true
+        KOSMAZ: true,
+        APRANTIFLG: true, 
+        EKURI: "1"
     )
 }

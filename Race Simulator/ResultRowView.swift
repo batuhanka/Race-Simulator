@@ -4,7 +4,7 @@ struct ResultRowView: View {
     let finisher: HorseResult
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             
             HStack(alignment: .center, spacing: 4) {
                 
@@ -16,11 +16,41 @@ struct ResultRowView: View {
                 jerseyImage
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(finisher.AD ?? "")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(finisher.KOSMAZ == true ? .red : .primary)
-                        .strikethrough(finisher.KOSMAZ == true, color: .red)
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(finisher.AD ?? "")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(finisher.KOSMAZ == true ? .red : .primary)
+                            .strikethrough(finisher.KOSMAZ == true, color: .red)
+                        
+                        if let ekuri = finisher.EKURI, ekuri != "false" {
+                            AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(ekuri).gif")) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 14, height: 14)
+                                case .failure, .empty:
+                                    EmptyView()
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    
+                    HStack(spacing: 4) {
+                        Text(finisher.YAS ?? "")
+                        Text(String(format: "%.1f", finisher.KILO ?? 0) + "kg")
+                        Text(finisher.TAKI ?? "").fontWeight(.semibold).foregroundColor(.green)
+                        
+                    }
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                     
                 }
                 
@@ -30,16 +60,26 @@ struct ResultRowView: View {
                     
                     Spacer()
                     
-                    Text(finisher.JOKEYADI ?? "")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 2) {
+                        if finisher.APRANTIFLG == true {
+                            Text("AP")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.red)
+                                .padding(.horizontal, -16)
+                                .offset(x: 4, y: -4)
+                        }
+                        
+                        Text(finisher.JOKEYADI ?? "")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                    }
                     
                     Spacer()
                     
                     if let ganyan = finisher.GANYAN, ganyan != "0", !ganyan.isEmpty {
                         Text("\(ganyan)")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(Color.green.opacity(0.12))
@@ -54,14 +94,20 @@ struct ResultRowView: View {
                 
                 HStack {
                     
-                    Text(finisher.SAHIPADI ?? "")
-                        .font(.caption2)
-                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(finisher.ANTRENORADI ?? "")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Text(finisher.SAHIPADI ?? "")
+                            .font(.caption2)
+                    }
+                                        
                     Spacer()
                     
                     if let fark = finisher.FARK, !fark.isEmpty {
                         Text(fark)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.12))
@@ -70,8 +116,8 @@ struct ResultRowView: View {
                     }
                     
                     
-                    Text(finisher.DERECE ?? "-")
-                        .font(.system(size: 10, weight: .semibold))
+                    Text(finisher.DERECE ?? "")
+                        .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.cyan.opacity(0.12))
@@ -85,6 +131,7 @@ struct ResultRowView: View {
         .padding(.horizontal, 4)
         .background(Color(.systemBackground))
         .cornerRadius(10)
+        .opacity(finisher.KOSMAZ == true ? 0.5 : 1.0)
     }
     
     // MARK: - Jersey Image Component
@@ -114,7 +161,7 @@ struct ResultRowView: View {
 // MARK: - Preview
 #Preview {
     ScrollView {
-        VStack(spacing: 12) {
+        VStack(spacing: 4) {
             // 1. Örnek: Kazanan (Ganyan ve Fark belirgin)
             ResultRowView(finisher: .mock(
                 no: "3",
@@ -178,6 +225,7 @@ extension HorseResult {
             NO: no,
             JOKEYADI: jokey,
             SONUC: no,
+            YAS: "4y d a",
             DERECE: derece,
             GANYAN: ganyan,
             FARK: fark,
@@ -187,7 +235,9 @@ extension HorseResult {
             SAHIPADI: "ALİ VELİ",
             FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg",
             TAKI: taki,
-            KOSMAZ: false
+            KOSMAZ: true,
+            APRANTIFLG: true,
+            EKURI:"1"
         )
     }
 }

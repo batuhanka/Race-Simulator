@@ -40,15 +40,13 @@ struct RaceDetailView: View {
                 if kosular.indices.contains(selectedIndex) {
                     let seciliKosu = kosular[selectedIndex]
                     
-                    // Logic Switch: Results vs Program
                     if let results = currentRaceResult,
                        let finishers = results.SONUCLAR,
                        !finishers.isEmpty,
-                       results.KOD == seciliKosu.KOD { // Kritik kontrol: Gelen veri gerçekten bu koşuya mı ait?
+                       results.KOD == seciliKosu.KOD {
                         
-                        // --- RESULTS VIEW ---
                         ScrollView {
-                            LazyVStack(spacing: 8) {
+                            LazyVStack(spacing: 4) {
                                 ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
                                     ResultRowView(finisher: finisher)
                                 }
@@ -61,11 +59,11 @@ struct RaceDetailView: View {
                         loadingView
                     } else {
                         ScrollView {
-                            LazyVStack(spacing: 4) { // Kartlar arasındaki dikey boşluk
+                            LazyVStack(spacing: 4) {
                                 if let atlar = seciliKosu.atlar, !atlar.isEmpty {
                                     ForEach(atlar) { at in
                                         ListItemView(at: at)
-                                            .padding(.horizontal) // Kartları ekran kenarından iter
+                                            .padding(.horizontal)
                                     }
                                     
                                     Color.clear.frame(height: 70)
@@ -82,23 +80,20 @@ struct RaceDetailView: View {
         }
         .background(
             ZStack {
-                // 1. Temel arka plan rengi (Koyu bir zemin üzerine renk bindireceğiz)
                 Color.black.ignoresSafeArea()
                 
-                // 2. Dinamik Pist Rengi
-                let pistRenkleri = getPistColors(for: selectedIndex)
+                 let pistRenkleri = getPistColors(for: selectedIndex)
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        pistRenkleri.last?.opacity(0.6) ?? .black, // Pistin ana rengi (üstten)
-                        Color.black.opacity(0.8)                 // Siyaha doğru geçiş
+                        pistRenkleri.last?.opacity(0.6) ?? .black,
+                        Color.black.opacity(0.8)
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.6), value: selectedIndex) // Renk geçişini yumuşatır
+                .animation(.easeInOut(duration: 0.6), value: selectedIndex)
                 
-                // 3. Hafif bir doku (Opsiyonel: Daha derinlikli durması için)
                 RadialGradient(
                     gradient: Gradient(colors: [.clear, .black.opacity(0.4)]),
                     center: .center,
@@ -121,9 +116,6 @@ struct RaceDetailView: View {
             if kosular.indices.contains(selectedIndex) {
                 checkResults(for: kosular[selectedIndex])
             }
-            let seciliKosu = kosular[selectedIndex]
-            logRaceDetails(race: seciliKosu, date: selectedDate, city: raceName)
-            
         }
     }
 }
@@ -161,7 +153,7 @@ extension RaceDetailView {
                     
                     Text(kosu.BILGI_TR ?? "")
                         .font(.subheadline)
-                        .lineLimit(2, reservesSpace: true) // 3 satırlık yeri hep ayırır
+                        .lineLimit(2, reservesSpace: true)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
@@ -273,11 +265,6 @@ extension RaceDetailView {
                     await MainActor.run { self.isFetchingResults = false }
                 }
             }
-    }
-    
-    private func logRaceDetails(race: Race, date: Date, city: String) {
-        // Simple console logging to avoid View return errors
-        print("DEBUG: Checking \(city) - KOD: \(race.KOD)")
     }
     
     private func fetchNewCityData(cityName: String) {

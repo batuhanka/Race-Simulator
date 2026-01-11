@@ -14,62 +14,64 @@ struct CustomBottomBar: View {
     var body: some View {
         VStack(spacing: 0) {
 
+            Spacer()
+            
             Rectangle()
-                .fill(Color.cyan.opacity(0.2))
-                .frame(height: 0.5)
+                .fill(Color.white.opacity(0.08))
+                .frame(height: 0.1)
 
-            HStack(alignment: .bottom) {
+            HStack(alignment: .center, spacing: 0) {
 
                 BottomTabItem(
                     icon: "house.fill",
                     title: "Anasayfa",
                     active: selectedBottomTab == 0,
                     action: { selectedBottomTab = 0 }
-                )
+                ).id("tab_0")
 
                 BottomTabItem(
                     icon: "list.bullet.rectangle",
                     title: "Program",
                     active: selectedBottomTab == 1,
                     action: { selectedBottomTab = 1 }
-                )
+                ).id("tab_1")
 
-                VStack(spacing: 4) {
-                    Image("tayzekatransparent")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 60, height: 60)
-                        .shadow(color: Color.cyan.opacity(0.8), radius: 6)
-
-                    Text("Tay Zeka Kuponu")
-                        .font(.system(size: 10, weight: .black))
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.gray)
-                }
-                .frame(maxWidth: .infinity)
-                .offset(y: 0)
-                .onTapGesture { selectedBottomTab = 2 }
-
+                BottomTabItem(
+                    icon: "brain.fill",
+                    title: "Tay Zeka",
+                    active: selectedBottomTab == 2,
+                    action: { selectedBottomTab = 2 }
+                ).id("tab_2")
+                
+                BottomTabItem(
+                    icon: "list.clipboard.fill",
+                    title: "Muhtemeller",
+                    active: selectedBottomTab == 3,
+                    action: { selectedBottomTab = 3 }
+                ).id("tab_3")
+                
                 BottomTabItem(
                     icon: "flag.fill",
                     title: "Sonuçlar",
-                    active: selectedBottomTab == 3,
-                    action: { selectedBottomTab = 3 }
-                )
-
-                BottomTabItem(
-                    icon: "ticket.fill",
-                    title: "Muhtemeller",
                     active: selectedBottomTab == 4,
                     action: { selectedBottomTab = 4 }
-                )
+                ).id("tab_4")
             }
-            .padding(.top, -30)
-            .padding(.bottom, 10)
-            .background(Color.black)
+            
+            .padding(.vertical, 8)
+            .padding(.horizontal, 2)
+            .background(Color.black.opacity(0.9))
+            .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 40, style: .continuous)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
         }
+        .padding(.bottom, 2)
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 }
+
 
 // MARK: - TAB ITEM
 struct BottomTabItem: View {
@@ -81,19 +83,26 @@ struct BottomTabItem: View {
 
     var body: some View {
         Button(action: {
-            withAnimation(.easeInOut) {
+            withAnimation(.easeInOut(duration: 0.3)) {
                 action()
             }
         }) {
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
                 
                 Text(title)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 10, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
             .foregroundColor(active ? .cyan : .gray)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 2)
+            .background(
+                active ? Color.cyan.opacity(0.15) : Color.clear
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .transition(.scale.combined(with: .opacity))
         }
         .buttonStyle(.plain)
     }

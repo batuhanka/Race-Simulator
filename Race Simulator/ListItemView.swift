@@ -42,20 +42,50 @@ struct ListItemView: View {
                 jerseyImage
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(at.AD ?? "")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(at.KOSMAZ == true ? .red : .primary)
-                        .strikethrough(at.KOSMAZ == true, color: .red)
+                    HStack(alignment: .top, spacing: 4) {
+                        Text(at.AD ?? "")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(at.KOSMAZ == true ? .red : .primary)
+                            .strikethrough(at.KOSMAZ == true, color: .red)
+                        
+                        if let ekuri = at.EKURI, ekuri != "false" {
+                            AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(ekuri).gif")) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 14, height: 14)
+                                case .failure, .empty:
+                                    EmptyView()
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(at.JOKEYADI ?? "")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 2) {
+                        if at.APRANTIFLG == true {
+                            Text("AP")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.red)
+                                .padding(.horizontal, -16)
+                                .offset(x: 4, y: -4)
+                        }
+                        
+                        Text(at.JOKEYADI ?? "")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                    }
                     
                     
                     HStack(spacing: 0) {
@@ -84,9 +114,8 @@ struct ListItemView: View {
                 
                 HStack(spacing: 4) {
                     Text(at.YAS ?? "")
-                    Text("\(at.KILO ?? 0)kg")
-                    Text(at.TAKI ?? "")
-                    
+                    Text(String(format: "%.1f", at.KILO ?? 0) + "kg")
+                    Text(at.TAKI ?? "").fontWeight(.semibold).foregroundColor(.green)
                 }
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -130,6 +159,7 @@ struct ListItemView: View {
         )
         
     }
+    
     
     private var jerseyImage: some View {
         AsyncImage(url: URL(string: at.FORMA ?? "")) { phase in
