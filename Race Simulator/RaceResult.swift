@@ -9,9 +9,16 @@ struct RaceResult: Codable {
     let PIST: String?
     let MESAFE: String?
     let BAHISLER_TR: String?
+    let FOTOFINISH: String?
+    let VIDEO: String?
     
     let atlar: [HorseResult]?
     var SONUCLAR: [HorseResult]? { atlar }
+    
+    enum CodingKeys: String, CodingKey {
+        case KOD, RACENO, BILGI_TR, TARIH, SAAT, PIST, MESAFE, BAHISLER_TR, FOTOFINISH, VIDEO, atlar
+    }
+    
 }
 
 struct HorseResult: Codable, Identifiable {

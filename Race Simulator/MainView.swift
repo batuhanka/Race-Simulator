@@ -55,7 +55,6 @@ struct MainView: View {
                     }
                     if let agfArray = program["agf"] as? [[String: Any]] { agf = agfArray }
                     
-                    // Navigasyonu tetikle
                     self.selectedRace = city
                     self.showRaceDetails = true
                     self.isGlobalFetching = false

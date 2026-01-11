@@ -1,3 +1,11 @@
+//
+//  VideoDetailView.swift
+//  Race Simulator
+//
+//  Created by Batuhan KANDIRAN on 12.01.2026.
+//
+
+
 import SwiftUI
 import AVKit
 
@@ -7,24 +15,32 @@ struct VideoDetailView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black.opacity(0.8).ignoresSafeArea()
 
-            if let url = URL(string: videoURL) {
-                VideoPlayer(player: AVPlayer(url: url))
-                    .frame(height: 400)
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { dismiss() }) {
-                    HStack {
-                        Image(systemName: "chevron.left")
-                        Text("Geri")
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.white)
                     }
-                    .foregroundColor(.cyan)
+                    .padding()
                 }
+
+                Spacer()
+
+                if let url = URL(string: videoURL) {
+                    VideoPlayer(player: AVPlayer(url: url))
+                        .frame(maxWidth: 350, maxHeight: 450)
+                        .cornerRadius(12)
+                }
+
+                Spacer()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

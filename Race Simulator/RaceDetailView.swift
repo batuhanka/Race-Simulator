@@ -47,10 +47,59 @@ struct RaceDetailView: View {
                         
                         ScrollView {
                             LazyVStack(spacing: 4) {
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    
+                                    HStack(spacing: 4) {
+                                        if let fotoURL = results.FOTOFINISH, !fotoURL.isEmpty {
+                                            NavigationLink(destination: PhotoDetailView(imageURL: fotoURL)) {
+                                                HStack {
+                                                    Image(systemName: "photo.fill")
+                                                    Text("Foto Finiş")
+                                                        .font(.caption.bold())
+                                                }
+                                                .foregroundColor(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 28)
+                                                .background(Color.blue.opacity(0.6))
+                                                .cornerRadius(16)
+                                            }
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if let videoURL = results.VIDEO, !videoURL.isEmpty {
+                                            NavigationLink(destination: VideoDetailView(videoURL: videoURL)) {
+                                                HStack {
+                                                    Image(systemName: "play.circle.fill")
+                                                    Text("Yarışı İzle")
+                                                        .font(.caption.bold())
+                                                }
+                                                .foregroundColor(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 28)
+                                                .background(Color.orange.opacity(0.6))
+                                                .cornerRadius(16)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(results.BAHISLER_TR ?? "")")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.green)
+                                        .lineLimit(15)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .cornerRadius(2)
+                                .padding(.bottom, 4)
+                                
                                 ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
                                     ResultRowView(finisher: finisher)
                                 }
-                                Color.clear.frame(height: 65)
+                                Color.clear.frame(height: 50)
                             }
                             .padding(.horizontal)
                         }
@@ -60,13 +109,28 @@ struct RaceDetailView: View {
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 4) {
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    
+                                    Text("\(seciliKosu.BAHISLER_TR ?? "")")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.green)
+                                        .lineLimit(5)
+                                    
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .cornerRadius(2)
+                                .padding(.bottom, 4)
+                                .padding(.horizontal, 16)
+                                
                                 if let atlar = seciliKosu.atlar, !atlar.isEmpty {
                                     ForEach(atlar) { at in
                                         ListItemView(at: at)
                                             .padding(.horizontal)
                                     }
                                     
-                                    Color.clear.frame(height: 70)
+                                    Color.clear.frame(height: 50)
                                 } else {
                                     ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
                                 }
@@ -145,8 +209,16 @@ extension RaceDetailView {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("\(kosu.RACENO ?? "0"). Koşu")
-                            .font(.title3.bold())
+                            .font(.subheadline.bold())
+                        
                         Spacer()
+                        
+                        Text(selectedDate.formatted(.dateTime.locale(Locale(identifier: "tr_TR")).month().day().year()))
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Spacer()
+                        
                         Label(kosu.SAAT ?? "00:00", systemImage: "clock.fill")
                             .font(.subheadline.bold())
                     }
@@ -196,31 +268,34 @@ extension RaceDetailView {
     }
     
     private var dropdownTitleMenu: some View {
-        
-        Menu {
-            ForEach(allRaces, id: \.self) { city in
-                Button {
-                    withAnimation { self.raceName = city }
-                } label: {
-                    HStack {
-                        Text(city)
-                        if city == raceName {
-                            Image(systemName: "checkmark")
+        VStack(spacing: 6) {
+            
+            Menu {
+                ForEach(Array(Set(allRaces)).sorted(), id: \.self) { city in
+                    Button {
+                        withAnimation { self.raceName = city }
+                    } label: {
+                        HStack {
+                            Text(city)
+                            if city == raceName {
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
                 }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+                    Image(systemName: "chevron.down.circle.fill")
+                        .foregroundColor(.cyan)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                //.background(Capsule().fill(Color.black.opacity(0.2)))
             }
-        } label: {
-            HStack(spacing: 6) {
-                Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                Image(systemName: "chevron.down.circle.fill")
-                    .foregroundColor(.cyan)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(Color.black.opacity(0.2)))
+            
         }
     }
 }
@@ -276,7 +351,6 @@ extension RaceDetailView {
                 let dateStr = apiDateFormatter.string(from: selectedDate)
                 let program = try await parser.getProgramData(raceDate: dateStr, cityName: cityName)
                 
-                // Parse Logic...
                 var newHava: HavaData?
                 if let havaDict = program["hava"] as? [String: Any] { newHava = HavaData(from: havaDict) }
                 
@@ -302,5 +376,4 @@ extension RaceDetailView {
         }
     }
 }
-
 
