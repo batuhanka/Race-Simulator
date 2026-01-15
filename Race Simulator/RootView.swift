@@ -22,7 +22,6 @@ struct Particle: Identifiable {
 struct ExplosionView: View {
     @State private var particles: [Particle] = []
     @State private var opacity: Double = 1.0
-    // Hepsinin aynı noktada başlaması için tam 0.0 değerini kullanıyoruz
     @State private var animationProgress: CGFloat = 0.0
     @State private var isVisible: Bool = false
     
@@ -35,7 +34,6 @@ struct ExplosionView: View {
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(particle.color)
                             .position(
-                                // Hepsi aynı (0,0) ofsetinden başlıyor
                                 x: (geo.size.width / 2) + (particle.vx * animationProgress),
                                 y: (geo.size.height / 2) + (particle.vy * animationProgress)
                             )
@@ -45,7 +43,6 @@ struct ExplosionView: View {
             }
             .onAppear {
                 createExplosion()
-                // Milisaniyelik gecikme ile görünür kılıp patlatıyoruz
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
                     isVisible = true
                     withAnimation(.easeOut(duration: 1.2)) {

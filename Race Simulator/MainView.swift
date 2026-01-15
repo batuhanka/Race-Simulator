@@ -15,8 +15,7 @@ struct MainView: View {
     // MARK: Binding
     @Binding var selectedBottomTab: Int
     
-    
-    // MARK: - Helpers
+     // MARK: - Helpers
     let parser = JsonParser()
     
     // MARK: - Date Formatters
@@ -45,7 +44,6 @@ struct MainView: View {
                 )
                 
                 await MainActor.run {
-                    // Verileri doldur
                     if let havaDict = program["hava"] as? [String: Any] { havaData = HavaData(from: havaDict) }
                     if let kosularArray = program["kosular"] as? [[String: Any]] {
                         do {
@@ -113,7 +111,6 @@ struct MainView: View {
             }
             .onAppear {
                 fetchRaces()
-                selectedBottomTab = 0
             }
         }
     }
@@ -152,7 +149,6 @@ struct MainView: View {
     private var dynamicRaceProgramSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             
-            // Tarih Seçici
             HStack {
                 Button { changeDate(by: -1) } label: {
                     Image(systemName: "chevron.left.circle.fill")
@@ -185,7 +181,6 @@ struct MainView: View {
             .contentShape(Rectangle())
             .zIndex(1)
             
-            // Yarış Kartları
             if races.isEmpty {
                 VStack(spacing: 15) {
                     Text("Yarış Programı bulunamadı.")

@@ -13,12 +13,14 @@ struct MainShellView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            
-            MainView(selectedBottomTab: $selectedTab)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
+            if selectedTab == 3 {
+                OddsView(selectedDate: Date())
+            } else {
+                NavigationStack {
+                    MainView(selectedBottomTab: $selectedTab)
+                }
+            }
             CustomBottomBar(selectedBottomTab: $selectedTab)
-                .transition(.move(edge: .bottom))
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 struct RaceDetailView: View {
     // MARK: - PROPERTIES
@@ -13,6 +14,10 @@ struct RaceDetailView: View {
     
     @State private var fetchTask: Task<Void, Never>? = nil
     @State private var isFetchingResults: Bool = false
+    
+    @State private var showVideoFullScreen = false
+    @State private var showingPhotoURL: String? = nil
+    @State private var videoPlayer: AVPlayer? = nil
     
     // MARK: Binding
     @Binding var selectedBottomTab: Int
@@ -51,8 +56,11 @@ struct RaceDetailView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     
                                     HStack(spacing: 4) {
+                                        // Photo button -> show inline overlay
                                         if let fotoURL = results.FOTOFINISH, !fotoURL.isEmpty {
-                                            NavigationLink(destination: PhotoDetailView(imageURL: fotoURL)) {
+                                            Button {
+                                                withAnimation { self.showingPhotoURL = fotoURL }
+                                            } label: {
                                                 HStack {
                                                     Image(systemName: "photo.fill")
                                                     Text("Foto Finiş")
@@ -68,8 +76,15 @@ struct RaceDetailView: View {
                                         
                                         Spacer()
                                         
+                                        // Video button -> prepare AVPlayer and show inline
                                         if let videoURL = results.VIDEO, !videoURL.isEmpty {
-                                            NavigationLink(destination: VideoDetailView(videoURL: videoURL)) {
+                                            Button {
+                                                if let url = URL(string: videoURL) {
+                                                    let player = AVPlayer(url: url)
+                                                    player.play()
+                                                    self.videoPlayer = player
+                                                }
+                                            } label: {
                                                 HStack {
                                                     Image(systemName: "play.circle.fill")
                                                     Text("Yarışı İzle")
@@ -121,7 +136,7 @@ struct RaceDetailView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .cornerRadius(2)
-                                .padding(.bottom, 4)
+                                .padding(.bottom ,4)
                                 .padding(.horizontal, 16)
                                 
                                 if let atlar = seciliKosu.atlar, !atlar.isEmpty {
@@ -146,7 +161,7 @@ struct RaceDetailView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                 let pistRenkleri = getPistColors(for: selectedIndex)
+                let pistRenkleri = getPistColors(for: selectedIndex)
                 LinearGradient(
                     gradient: Gradient(colors: [
                         pistRenkleri.last?.opacity(0.6) ?? .black,
@@ -172,16 +187,92 @@ struct RaceDetailView: View {
                 dropdownTitleMenu
             }
         }
-        .onChange(of: raceName) { oldValue, newValue in
+        .onChange(of: raceName) { _, newValue in
             fetchNewCityData(cityName: newValue)
         }
         .onAppear() {
-            selectedBottomTab = 1
             if kosular.indices.contains(selectedIndex) {
                 checkResults(for: kosular[selectedIndex])
             }
         }
+        
+        .overlay {
+            Group {
+                if let photo = showingPhotoURL, let url = URL(string: photo) {
+                    modalOverlay(title: "") {
+                        withAnimation { showingPhotoURL = nil }
+                    } content: {
+                        ZoomableRemoteImage(url: url)
+                            .frame(maxWidth: 520, maxHeight: 360)
+                    }
+                } else if let player = videoPlayer {
+                    modalOverlay(title: "") {
+                        player.pause()
+                        withAnimation { videoPlayer = nil }
+                    } content: {
+                        VideoPlayer(player: player)
+                            .frame(maxWidth: 520, maxHeight: 320)
+                            .cornerRadius(12)
+                            .onTapGesture { showVideoFullScreen = true }
+                            .onAppear { player.play() }
+                    }
+                    .fullScreenCover(isPresented: $showVideoFullScreen) {
+                        ZStack {
+                            Color.black.ignoresSafeArea()
+                            VideoPlayer(player: player)
+                                .ignoresSafeArea()
+                                .onAppear { player.play() }
+                        }
+                    }
+                }
+            }
+        }
     }
+    
+    private struct ZoomableRemoteImage: View {
+        let url: URL
+        @State private var scale: CGFloat = 1
+        @State private var lastScale: CGFloat = 1
+        @State private var isZoomed = false
+
+        var body: some View {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    scale = lastScale * value
+                                }
+                                .onEnded { _ in
+                                    lastScale = scale
+                                }
+                        )
+                        .onTapGesture(count: 2) {
+                            withAnimation(.easeInOut) {
+                                isZoomed.toggle()
+                                scale = isZoomed ? 2 : 1
+                                lastScale = scale
+                            }
+                        }
+                case .empty:
+                    ProgressView().tint(.cyan)
+                case .failure:
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 48))
+                        .foregroundColor(.secondary)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+        }
+    }
+    
+    
 }
 
 // MARK: - SUBVIEWS
@@ -248,7 +339,7 @@ extension RaceDetailView {
                     checkResults(for: kosular[index])
                 } label: {
                     Text(kosuNo)
-                        .font(.system(size: 13, weight: .bold)) // Biraz büyüttük
+                        .font(.system(size: 13, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
                         .background(
@@ -293,7 +384,6 @@ extension RaceDetailView {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                //.background(Capsule().fill(Color.black.opacity(0.2)))
             }
             
         }
@@ -320,26 +410,26 @@ extension RaceDetailView {
     private func checkResults(for race: Race) {
         
         fetchTask?.cancel()
-            
-            isFetchingResults = true
-            currentRaceResult = nil
-            
-            let dateStr = apiDateFormatter.string(from: selectedDate)
-            
-            fetchTask = Task {
-                do {
-                    let result = try await parser.getRaceResult(raceDate: dateStr, cityName: raceName, targetKod: race.KOD)
-                    
-                    try Task.checkCancellation()
-                    
-                    await MainActor.run {
-                        self.currentRaceResult = result
-                        self.isFetchingResults = false // Yükleme bitti
-                    }
-                } catch {
-                    await MainActor.run { self.isFetchingResults = false }
+        
+        isFetchingResults = true
+        currentRaceResult = nil
+        
+        let dateStr = apiDateFormatter.string(from: selectedDate)
+        
+        fetchTask = Task {
+            do {
+                let result = try await parser.getRaceResult(raceDate: dateStr, cityName: raceName, targetKod: race.KOD)
+                
+                try Task.checkCancellation()
+                
+                await MainActor.run {
+                    self.currentRaceResult = result
+                    self.isFetchingResults = false // Yükleme bitti
                 }
+            } catch {
+                await MainActor.run { self.isFetchingResults = false }
             }
+        }
     }
     
     private func fetchNewCityData(cityName: String) {
@@ -375,5 +465,42 @@ extension RaceDetailView {
             }
         }
     }
+    
+    // Modal overlay helper
+    private func modalOverlay<Content: View>(
+        title: String,
+        onClose: @escaping () -> Void,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                HStack {
+                    Text(title)
+                        .font(.title3.bold())
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
+                            .padding(8)
+                            .background(Color.black.opacity(0.05))
+                            .clipShape(Circle())
+                    }
+                    .tint(.primary)
+                }
+                
+                content()
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(20)
+            .frame(maxWidth: 600)
+            .background(.ultraThinMaterial)
+            .cornerRadius(18)
+            .shadow(radius: 18)
+            .padding(.horizontal, 18)
+        }
+        .transition(.opacity.combined(with: .scale))
+    }
 }
-
