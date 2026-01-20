@@ -20,6 +20,7 @@ struct DynamicTableRow: Identifiable {
     let id = UUID()
     let isFavori: Bool
     let isKosmaz: Bool
+    let ekuriGrubu: String
     var cells: [TableCell]
 }
 
@@ -47,13 +48,14 @@ struct Bahis: Codable {
 }
 
 struct BahisOran: Codable {
-    let s1: String?, s2: String?, ganyan: String?, k: Bool?, a: Bool?
-    enum CodingKeys: String, CodingKey { case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A" }
+    let s1: String?, s2: String?, ganyan: String?, k: Bool?, a: Bool?, e: String?
+    enum CodingKeys: String, CodingKey { case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A", e = "E" }
 }
 
 // MARK: - Ana View
 struct OddsView: View {
     let selectedDate: Date
+    @State private var selectedTab: Int = 0
     @State private var runsData: [String: [String]] = [:]
     @State private var cities: [String] = []
     @State private var selectedCity: String? = nil
@@ -61,9 +63,7 @@ struct OddsView: View {
     @State private var isLoading = false
     @State private var raceTime: String = ""
     @State private var raceStatus: String = ""
-    
-    // Değişen State Tanımları
-    @State private var tableRows: [DynamicTableRow] = [] // TİP GÜNCELLENDİ
+    @State private var tableRows: [DynamicTableRow] = []
     @State private var currentBahisTurleri: [String] = []
     
     private var turkishDateString: String {
@@ -76,22 +76,71 @@ struct OddsView: View {
     var body: some View {
         VStack(spacing: 0) {
             citySelectionBar
-            if !tableRows.isEmpty {
+            
+            if isLoading && cities.isEmpty {
+                loadingView
+            } else if cities.isEmpty {
+                emptyStateView(message: "Seçilen tarih için henüz muhtemeller yayınlanmamıştır.")
+            } else {
+                tabSelectionBar
                 runSelectionBar
-                statusInfoBar
-                dynamicTableHeader
+                
+                if selectedTab == 0 {
+                    statusInfoBar
+                    dynamicTableHeader
+                    dynamicMainList
+                } else {
+                    agfPlaceholderView
+                }
             }
-            dynamicMainList
         }
-        .background(Color.white)
+        .background(Color(white: 0.12))
         .task {
             await loadInitialData()
         }
     }
 }
 
+
 // MARK: - View Bileşenleri
 extension OddsView {
+    
+    
+    private func emptyStateView(message: String) -> some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.3))
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    private var agfPlaceholderView: some View {
+        VStack {
+            Spacer()
+            Image(systemName: "chart.bar.xaxis")
+                .font(.system(size: 50))
+                .foregroundColor(.gray.opacity(0.3))
+                .padding(.bottom, 10)
+            Text("At Yarışı Genel Favorileri (AGF)")
+                .font(.headline)
+                .foregroundColor(.gray)
+            Text("Bu veri yakında aktif olacaktır.")
+                .font(.caption)
+                .foregroundColor(.gray.opacity(0.6))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
     
     private var citySelectionBar: some View {
         HStack {
@@ -120,6 +169,48 @@ extension OddsView {
         .padding(.horizontal)
         .frame(height: 55)
         .background(Color(white: 0.12))
+    }
+    
+    private var tabSelectionBar: some View {
+        HStack(spacing: 0) {
+            Button {
+                selectedTab = 0
+            } label: {
+                Text("Muhtemeller")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(selectedTab == 0 ? .orange : .gray)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color(white: 0.12))
+                    .overlay(
+                        Rectangle()
+                            .fill(selectedTab == 0 ? Color.orange : Color.clear)
+                            .frame(height: 3),
+                        alignment: .bottom
+                    )
+            }
+            .buttonStyle(.plain)
+            
+            Button {
+                selectedTab = 1
+            } label: {
+                Text("AGF")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(selectedTab == 1 ? .orange : .gray)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color(white: 0.12))
+                    .overlay(
+                        Rectangle()
+                            .fill(selectedTab == 1 ? Color.orange : Color.clear)
+                            .frame(height: 3),
+                        alignment: .bottom
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .background(Color.black)
+        .overlay(Divider(), alignment: .bottom)
     }
     
     private var runSelectionBar: some View {
@@ -160,7 +251,7 @@ extension OddsView {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
-        .background(Color(white: 0.15))
+        .background(Color(white: 0.12))
     }
     
     private var statusInfoBar: some View {
@@ -174,8 +265,7 @@ extension OddsView {
         .background(Color(white: 0.9))
         .foregroundColor(.black)
     }
-
-    // DİNAMİK HEADER
+    
     private var dynamicTableHeader: some View {
         Group {
             if !tableRows.isEmpty {
@@ -184,70 +274,177 @@ extension OddsView {
                         Text(currentBahisTurleri[index])
                             .font(.system(size: 11, weight: .bold))
                             .frame(maxWidth: .infinity)
-                        if index < currentBahisTurleri.count - 1 { Divider() }
+                        if index < currentBahisTurleri.count - 1 {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 1.5)
+                        }
                     }
                 }
                 .frame(height: 35)
                 .background(Color.white)
-                .overlay(VStack{Divider(); Spacer(); Divider()})
+                .overlay(VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 1.5)
+                    Spacer()
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 1.5)
+                })
             }
         }
     }
     
-    // DİNAMİK LİSTE
     private var dynamicMainList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                        if isLoading {
-                            ProgressView()
-                                .padding(.top, 100)
-                                .tint(.orange) // Uygulama rengine uyum sağlar
-                        } else if tableRows.isEmpty {
-                            // VERİ OLMADIĞI DURUM TASARIMI
-                            VStack(spacing: 20) {
-                                Spacer(minLength: 80)
-                                
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.gray.opacity(0.3))
-                                
-                                VStack(spacing: 8) {
-                                    
-                                    Text("\(turkishDateString) tarihi için muhtemeller henüz yayınlanmamıştir.")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 40)
-                                }
-
-                            }
-                        } else {
-                    ForEach(tableRows) { row in
-                        HStack(spacing: 0) {
-                            ForEach(0..<row.cells.count, id: \.self) { index in
-                                let cell = row.cells[index]
-                                HStack {
-                                    Text(cell.label)
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundColor(row.isFavori && index == 0 ? .green : .primary)
-                                    Spacer()
-                                    Text(cell.odds)
-                                        .font(.system(size: 13, design: .monospaced))
-                                }
-                                .padding(.horizontal, 8)
-                                .frame(maxWidth: .infinity)
-                                
-                                if index < row.cells.count - 1 { Divider() }
-                            }
-                        }
-                        .frame(height: 42)
-                        .background(row.isKosmaz ? Color.gray.opacity(0.3) : Color.white)
-                        Divider()
+        ZStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    if tableRows.isEmpty && !isLoading {
+                        emptyStateView(message: "\(turkishDateString) tarihi için muhtemeller henüz yayınlanmamıştır.")
+                    } else {
+                        tableContent
                     }
-                    Color.clear.frame(height: 60)
+                }
+            }
+            
+            if isLoading && !tableRows.isEmpty {
+                Color.black.opacity(0.2)
+                    .edgesIgnoringSafeArea(.all)
+                ProgressView()
+                    .tint(.orange)
+            }
+        }
+    }
+    
+    private var loadingView: some View {
+        ProgressView()
+            .padding(.top, 100)
+            .tint(.orange)
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 80)
+            
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.3))
+            
+            Text("\(turkishDateString) tarihi için muhtemeller henüz yayınlanmamıştır.")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+    }
+    
+    private var tableContent: some View {
+        VStack(spacing: 0) {
+            let visibleRows = tableRows.filter { hasAnyContent(in: $0) }
+            
+            ForEach(visibleRows.indices, id: \.self) { index in
+                rowView(for: visibleRows[index])
+            }
+            
+            Color.clear.frame(height: 60)
+        }
+    }
+    
+    private func hasAnyContent(in row: DynamicTableRow) -> Bool {
+        return row.cells.contains { !$0.label.isEmpty || !$0.odds.isEmpty }
+    }
+    
+    private func rowView(for row: DynamicTableRow) -> some View {
+        HStack(spacing: 0) {
+            ForEach(0..<row.cells.count, id: \.self) { index in
+                cellView(for: row, at: index)
+                if index < row.cells.count - 1 && !isCellEmpty(row: row, fromIndex: index) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 1.5)
                 }
             }
         }
+        .frame(height: 48)
+    }
+    
+    private func cellView(for row: DynamicTableRow, at index: Int) -> some View {
+        let cell = row.cells[index]
+        let isEmpty = cell.label.isEmpty && cell.odds.isEmpty
+        
+        return VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                if !isEmpty {
+                    Text(cell.label)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(labelColor(for: row, at: index))
+                    
+                    if shouldShowEkuriIcon(for: row, at: index) {
+                        ekuriIcon(for: row)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(cell.odds)
+                        .font(.system(size: 12, design: .monospaced))
+                }
+            }
+            .padding(.horizontal, isEmpty ? 0 : 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+            if !isEmpty {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 1.5)
+            } else {
+                Color.clear.frame(height: 1.5)
+            }
+        }
+        .background(
+            isEmpty ? Color.clear : (index == 0 && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
+        )
+    }
+    
+    private func isCellEmpty(row: DynamicTableRow, fromIndex: Int) -> Bool {
+        let currentEmpty = row.cells[fromIndex].label.isEmpty && row.cells[fromIndex].odds.isEmpty
+        let nextEmpty = fromIndex + 1 < row.cells.count &&
+        row.cells[fromIndex + 1].label.isEmpty &&
+        row.cells[fromIndex + 1].odds.isEmpty
+        
+        return currentEmpty && nextEmpty
+    }
+    
+    private func shouldShowEkuriIcon(for row: DynamicTableRow, at index: Int) -> Bool {
+        return currentBahisTurleri[index] == "GANYAN" && !row.ekuriGrubu.isEmpty
+    }
+    
+    private func ekuriIcon(for row: DynamicTableRow) -> some View {
+        AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(row.ekuriGrubu).gif")) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+            case .failure, .empty:
+                EmptyView()
+            @unknown default:
+                EmptyView()
+            }
+        }
+        .frame(width: 16, height: 16)
+    }
+    
+    private func labelColor(for row: DynamicTableRow, at index: Int) -> Color {
+        return (row.isFavori && index == 0) ? .green : .primary
+    }
+    
+    private func rowBackground(for row: DynamicTableRow) -> Color {
+        if row.isKosmaz {
+            return Color.gray.opacity(0.8)
+        }
+        return Color.white
     }
 }
 
@@ -325,6 +522,7 @@ extension OddsView {
             var rowCells: [TableCell] = []
             var favoriMi = false
             var kosmazMi = false
+            var ekuriGrubu: String? = nil
             
             for bahis in bahisler {
                 let muhtemeller = bahis.muhtemeller ?? []
@@ -333,6 +531,7 @@ extension OddsView {
                     if bahis.tur == "GANYAN" {
                         favoriMi = m.a ?? false
                         kosmazMi = m.k ?? false
+                        ekuriGrubu = m.e
                     }
                     let label = m.s2 != nil ? "\(m.s1 ?? "")-\(m.s2 ?? "")" : (m.s1 ?? "")
                     let odds = m.k == true ? "K" : (m.ganyan ?? "-")
@@ -341,19 +540,17 @@ extension OddsView {
                     rowCells.append(TableCell(label: "", odds: ""))
                 }
             }
-            newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, cells: rowCells))
+            newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, ekuriGrubu: ekuriGrubu ?? "", cells: rowCells))
         }
         self.tableRows = newRows
     }
 }
 
 #Preview {
-    // 1 gün öncesinin verilerini gösterir (genelde geçmiş veriler daha stabildir)
     OddsView(selectedDate: Date())
         .preferredColorScheme(.light)
 }
 
-// Preview için sahte veri üretici (Opsiyonel: Eğer verisiz ekranı görmek istersen)
 struct OddsView_Previews: PreviewProvider {
     static var previews: some View {
         OddsView(selectedDate: Date())
