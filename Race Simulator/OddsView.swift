@@ -24,6 +24,7 @@ struct DynamicTableRow: Identifiable {
     var cells: [TableCell]
 }
 
+
 struct TableCell {
     let label: String
     let odds: String
@@ -52,6 +53,35 @@ struct BahisOran: Codable {
     enum CodingKeys: String, CodingKey { case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A", e = "E" }
 }
 
+struct PulseText: View {
+    let label: String
+    let odds: String
+    let color: Color
+    let fontSizeLabel: CGFloat
+    let fontSizeOdds: CGFloat
+    
+    @State private var opacity: Double = 1.0
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: fontSizeLabel, weight: .bold))
+            Spacer()
+            Text(odds)
+                .font(.system(size: fontSizeOdds, design: .monospaced))
+        }
+        .foregroundColor(color)
+        .opacity(opacity)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                opacity = 0.3
+            }
+        }
+    }
+}
+
 // MARK: - Ana View
 struct OddsView: View {
     let selectedDate: Date
@@ -65,6 +95,7 @@ struct OddsView: View {
     @State private var raceStatus: String = ""
     @State private var tableRows: [DynamicTableRow] = []
     @State private var currentBahisTurleri: [String] = []
+
     
     private var turkishDateString: String {
         let formatter = DateFormatter()
@@ -104,7 +135,6 @@ struct OddsView: View {
 
 // MARK: - View Bileşenleri
 extension OddsView {
-    
     
     private func emptyStateView(message: String) -> some View {
         VStack(spacing: 20) {
@@ -256,6 +286,7 @@ extension OddsView {
     
     private var statusInfoBar: some View {
         HStack {
+            //Race(from: <#T##any Decoder#>)
             Spacer()
             Label(raceTime, systemImage: "clock.fill")
                 .font(.subheadline.bold())
@@ -343,9 +374,9 @@ extension OddsView {
         VStack(spacing: 0) {
             let visibleRows = tableRows.filter { hasAnyContent(in: $0) }
             
-            ForEach(visibleRows.indices, id: \.self) { index in
-                rowView(for: visibleRows[index])
-            }
+            ForEach(visibleRows, id: \.id) { row in
+                        rowView(for: row)
+                    }
             
             Color.clear.frame(height: 60)
         }
@@ -372,31 +403,44 @@ extension OddsView {
     private func cellView(for row: DynamicTableRow, at index: Int) -> some View {
         let cell = row.cells[index]
         let isEmpty = cell.label.isEmpty && cell.odds.isEmpty
+        let isFavoriLabel = row.isFavori && index == 0
         
         return VStack(spacing: 0) {
             HStack(spacing: 4) {
                 if !isEmpty {
-                    Text(cell.label)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(labelColor(for: row, at: index))
-                    
-                    if shouldShowEkuriIcon(for: row, at: index) {
-                        ekuriIcon(for: row)
+                    if isFavoriLabel {
+                        PulseText(
+                            label: cell.label,
+                            odds: cell.odds,
+                            color: .green,
+                            fontSizeLabel: calculateSize(for: cell.label),
+                            fontSizeOdds: calculateSize(for: cell.odds)
+                        )
+                    } else {
+                        HStack(spacing: 4) {
+                            Text(cell.label)
+                                .font(.system(size: calculateSize(for: cell.label), weight: .bold))
+                            
+                            if shouldShowEkuriIcon(for: row, at: index) {
+                                ekuriIcon(for: row)
+                            }
+                            
+                            Spacer()
+                            
+                            Text(cell.odds)
+                                .font(.system(size: calculateSize(for: cell.odds), design: .monospaced))
+                        }
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     }
-                    
-                    Spacer()
-                    
-                    Text(cell.odds)
-                        .font(.system(size: 12, design: .monospaced))
                 }
             }
             .padding(.horizontal, isEmpty ? 0 : 8)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             if !isEmpty {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 1.5)
+                Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
             } else {
                 Color.clear.frame(height: 1.5)
             }
@@ -404,6 +448,18 @@ extension OddsView {
         .background(
             isEmpty ? Color.clear : (index == 0 && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
         )
+    }
+                
+     
+    
+    private func calculateSize(for odds: String) -> CGFloat {
+        let length = odds.count
+        if length > 6 {
+            return 10
+        } else if length > 5 {
+            return 11
+        }
+        return 14
     }
     
     private func isCellEmpty(row: DynamicTableRow, fromIndex: Int) -> Bool {
@@ -543,6 +599,7 @@ extension OddsView {
             newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, ekuriGrubu: ekuriGrubu ?? "", cells: rowCells))
         }
         self.tableRows = newRows
+        
     }
 }
 
@@ -554,6 +611,6 @@ extension OddsView {
 struct OddsView_Previews: PreviewProvider {
     static var previews: some View {
         OddsView(selectedDate: Date())
-            .previewDisplayName("Canlı Veri Denemesi")
+            .previewDisplayName("Live Odds Trial")
     }
 }
