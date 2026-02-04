@@ -53,6 +53,28 @@ struct BahisOran: Codable {
     enum CodingKeys: String, CodingKey { case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A", e = "E" }
 }
 
+struct ProgramResponse: Codable {
+    let kosular: [Kosul]?
+}
+
+struct Kosul: Codable {
+    let no: String?
+    let bilgiTr: String?
+    let cinsDetay: String?
+    let grup: String?
+    let mesafe: String?
+    let pist: String?
+
+    enum CodingKeys: String, CodingKey {
+        case no = "NO"
+        case bilgiTr = "BILGI_TR"
+        case cinsDetay = "CINSDETAY_TR"
+        case grup = "GRUP_TR"
+        case mesafe = "MESAFE"
+        case pist = "PISTADI_TR"
+    }
+}
+
 struct PulseText: View {
     let label: String
     let odds: String
@@ -95,6 +117,8 @@ struct OddsView: View {
     @State private var raceStatus: String = ""
     @State private var tableRows: [DynamicTableRow] = []
     @State private var currentBahisTurleri: [String] = []
+    @State private var selectedRace: Race? = nil
+    @State private var raceInfo: String = ""
 
     
     private var turkishDateString: String {
@@ -284,17 +308,49 @@ extension OddsView {
         .background(Color(white: 0.12))
     }
     
+    private func fetchRaceInfo(_ run: Int, _ city: String?, _ date: Date) async -> String {
+        guard let city = city else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd"
+        let dateString = formatter.string(from: date)
+
+        let urlString = "https://ebayi.tjk.org/s/d/program/\(dateString)/full/\(city).json"
+
+        guard let url = URL(string: urlString),
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let decoded = try? JSONDecoder().decode(ProgramResponse.self, from: data) else {
+            return ""
+        }
+
+        if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
+            let merged = [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist]
+                .compactMap{ $0 }
+                .joined(separator: ", ")
+            return merged.isEmpty ? "" : merged
+        }
+        return ""
+    }
+    
     private var statusInfoBar: some View {
         HStack {
-            //Race(from: <#T##any Decoder#>)
-            Spacer()
             Label(raceTime, systemImage: "clock.fill")
-                .font(.subheadline.bold())
+            Spacer()
+            Text(raceInfo)
         }
+        .lineLimit(1)
+        .font(.footnote).bold()
         .padding(.horizontal)
         .frame(height: 35)
         .background(Color(white: 0.9))
         .foregroundColor(.black)
+        .task {
+            raceInfo = await fetchRaceInfo(selectedRun, selectedCity, selectedDate)
+        }
+        .onChange(of: selectedRun) {
+            Task {
+                raceInfo = await fetchRaceInfo(selectedRun, selectedCity, selectedDate)
+            }
+        }
     }
     
     private var dynamicTableHeader: some View {
