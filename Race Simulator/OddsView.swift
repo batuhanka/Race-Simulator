@@ -1,6 +1,5 @@
 import SwiftUI
 
-// MARK: - API Modelleri
 struct ChecksumResponse: Codable {
     let runs: [String: [String]]?
     let success: Bool
@@ -49,8 +48,29 @@ struct Bahis: Codable {
 }
 
 struct BahisOran: Codable {
-    let s1: String?, s2: String?, ganyan: String?, k: Bool?, a: Bool?, e: String?
-    enum CodingKeys: String, CodingKey { case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A", e = "E" }
+    let s1: String?, s2: String?, ganyan: String?, k: Bool?, a: Bool?
+    let e: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case s1 = "S1", s2 = "S2", ganyan = "G", k = "K", a = "A", e = "E"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        s1 = try container.decodeIfPresent(String.self, forKey: .s1)
+        s2 = try container.decodeIfPresent(String.self, forKey: .s2)
+        ganyan = try container.decodeIfPresent(String.self, forKey: .ganyan)
+        k = try container.decodeIfPresent(Bool.self, forKey: .k)
+        a = try container.decodeIfPresent(Bool.self, forKey: .a)
+        
+        if let stringValue = try? container.decodeIfPresent(String.self, forKey: .e) {
+            e = stringValue
+        } else if let intValue = try? container.decodeIfPresent(Int.self, forKey: .e) {
+            e = String(intValue)
+        } else {
+            e = nil
+        }
+    }
 }
 
 struct ProgramResponse: Codable {
@@ -456,53 +476,69 @@ extension OddsView {
         .frame(height: 48)
     }
     
+    struct PulseModifier: ViewModifier {
+        var active: Bool = true
+        @State private var opacity: Double = 1.0
+        
+        func body(content: Content) -> some View {
+            content
+                .opacity(opacity)
+                .onAppear {
+                    if active {
+                        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                            opacity = 0.3
+                        }
+                    }
+                }
+        }
+    }
+    
     private func cellView(for row: DynamicTableRow, at index: Int) -> some View {
         let cell = row.cells[index]
         let isEmpty = cell.label.isEmpty && cell.odds.isEmpty
-        let isFavoriLabel = row.isFavori && index == 0
+        
+        let isGanyanColumn: Bool = {
+            guard index < currentBahisTurleri.count else { return false }
+            return currentBahisTurleri[index].uppercased().contains("GANYAN")
+        }()
+        
+        let shouldShowAsFavori = row.isFavori && isGanyanColumn
         
         return VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                if !isEmpty {
-                    if isFavoriLabel {
-                        PulseText(
-                            label: cell.label,
-                            odds: cell.odds,
-                            color: .green,
-                            fontSizeLabel: calculateSize(for: cell.label),
-                            fontSizeOdds: calculateSize(for: cell.odds)
-                        )
-                    } else {
-                        HStack(spacing: 4) {
-                            Text(cell.label)
-                                .font(.system(size: calculateSize(for: cell.label), weight: .bold))
-                            
-                            if shouldShowEkuriIcon(for: row, at: index) {
-                                ekuriIcon(for: row)
-                            }
-                            
-                            Spacer()
-                            
-                            Text(cell.odds)
-                                .font(.system(size: calculateSize(for: cell.odds), design: .monospaced))
-                        }
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    }
-                }
-            }
-            .padding(.horizontal, isEmpty ? 0 : 8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
             if !isEmpty {
-                Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
+                HStack(spacing: 4) {
+                    if shouldShowAsFavori {
+                        Text(cell.label)
+                            .font(.system(size: calculateSize(for: cell.label), weight: .bold))
+                            .foregroundColor(.green)
+                            .modifier(PulseModifier())
+                    } else {
+                        Text(cell.label)
+                            .font(.system(size: calculateSize(for: cell.label), weight: .bold))
+                            .foregroundColor(.primary)
+                    }
+                    
+                    if shouldShowEkuriIcon(for: row, at: index) {
+                        ekuriIcon(for: row)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(cell.odds)
+                        .font(.system(size: calculateSize(for: cell.odds), design: .monospaced))
+                        .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                        .modifier(shouldShowAsFavori ? PulseModifier() : PulseModifier(active: false))
+                }
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Color.clear.frame(height: 1.5)
+                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            
+            Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
         }
         .background(
-            isEmpty ? Color.clear : (index == 0 && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
+            isEmpty ? Color.clear : (isGanyanColumn && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
         )
     }
                 
@@ -528,24 +564,31 @@ extension OddsView {
     }
     
     private func shouldShowEkuriIcon(for row: DynamicTableRow, at index: Int) -> Bool {
-        return currentBahisTurleri[index] == "GANYAN" && !row.ekuriGrubu.isEmpty
+        guard index < currentBahisTurleri.count else { return false }
+        let tur = currentBahisTurleri[index].trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let hasEkuri = !row.ekuriGrubu.isEmpty
+        let isGanyanColumn = tur.contains("GANYAN")
+        return isGanyanColumn && hasEkuri
     }
     
     private func ekuriIcon(for row: DynamicTableRow) -> some View {
-        AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(row.ekuriGrubu).gif")) { phase in
+        let urlString = "https://medya-cdn.tjk.org/imageftp/Img/\(row.ekuriGrubu).gif"
+        
+        return AsyncImage(url: URL(string: urlString)) { phase in
             switch phase {
             case .success(let image):
                 image
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 14, height: 14)
-            case .failure, .empty:
-                EmptyView()
+            case .failure:
+                Color.clear
+            case .empty:
+                ProgressView().scaleEffect(0.5)
             @unknown default:
                 EmptyView()
             }
         }
-        .frame(width: 16, height: 16)
+        .frame(width: 14, height: 14)
     }
     
     private func labelColor(for row: DynamicTableRow, at index: Int) -> Color {
@@ -626,25 +669,41 @@ extension OddsView {
     }
     
     func parseDataToRows(bahisler: [Bahis]) {
-        self.currentBahisTurleri = bahisler.compactMap { $0.tur }
-        let maxRows = bahisler.map { $0.muhtemeller?.count ?? 0 }.max() ?? 0
+        let cleanBahisler = bahisler.filter { $0.tur != nil }
+        self.currentBahisTurleri = cleanBahisler.compactMap { $0.tur }
+        
+        let maxRows = cleanBahisler.map { $0.muhtemeller?.count ?? 0 }.max() ?? 0
         var newRows: [DynamicTableRow] = []
         
         for i in 0..<maxRows {
             var rowCells: [TableCell] = []
             var favoriMi = false
             var kosmazMi = false
-            var ekuriGrubu: String? = nil
+            var satirEkuri = ""
             
-            for bahis in bahisler {
+            for bahis in cleanBahisler {
+                if let muhtemeller = bahis.muhtemeller, i < muhtemeller.count {
+                    let m = muhtemeller[i]
+        
+                    if let eRaw = m.e {
+                        
+                        let eStr = String(describing: eRaw).trimmingCharacters(in: .whitespaces)
+                        if !eStr.isEmpty && eStr != "0" {
+                            satirEkuri = "e\(eStr)"
+                        }
+                    }
+                    
+                    if (bahis.tur?.uppercased().contains("GANYAN") == true) {
+                        favoriMi = m.a ?? false
+                        kosmazMi = m.k ?? false
+                    }
+                }
+            }
+            
+            for bahis in cleanBahisler {
                 let muhtemeller = bahis.muhtemeller ?? []
                 if i < muhtemeller.count {
                     let m = muhtemeller[i]
-                    if bahis.tur == "GANYAN" {
-                        favoriMi = m.a ?? false
-                        kosmazMi = m.k ?? false
-                        ekuriGrubu = m.e
-                    }
                     let label = m.s2 != nil ? "\(m.s1 ?? "")-\(m.s2 ?? "")" : (m.s1 ?? "")
                     let odds = m.k == true ? "K" : (m.ganyan ?? "-")
                     rowCells.append(TableCell(label: label, odds: odds))
@@ -652,21 +711,14 @@ extension OddsView {
                     rowCells.append(TableCell(label: "", odds: ""))
                 }
             }
-            newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, ekuriGrubu: ekuriGrubu ?? "", cells: rowCells))
+            
+            newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, ekuriGrubu: satirEkuri, cells: rowCells))
         }
         self.tableRows = newRows
-        
     }
 }
 
 #Preview {
-    OddsView(selectedDate: Date())
+    OddsView(selectedDate: Date().addingTimeInterval(-86400))
         .preferredColorScheme(.light)
-}
-
-struct OddsView_Previews: PreviewProvider {
-    static var previews: some View {
-        OddsView(selectedDate: Date())
-            .previewDisplayName("Live Odds Trial")
-    }
 }
