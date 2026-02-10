@@ -95,35 +95,6 @@ struct Kosul: Codable {
     }
 }
 
-struct PulseText: View {
-    let label: String
-    let odds: String
-    let color: Color
-    let fontSizeLabel: CGFloat
-    let fontSizeOdds: CGFloat
-    
-    @State private var opacity: Double = 1.0
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Text(label)
-                .font(.system(size: fontSizeLabel, weight: .bold))
-            Spacer()
-            Text(odds)
-                .font(.system(size: fontSizeOdds, design: .monospaced))
-        }
-        .foregroundColor(color)
-        .opacity(opacity)
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                opacity = 0.3
-            }
-        }
-    }
-}
-
 // MARK: - Ana View
 struct OddsView: View {
     let selectedDate: Date
@@ -137,7 +108,6 @@ struct OddsView: View {
     @State private var raceStatus: String = ""
     @State private var tableRows: [DynamicTableRow] = []
     @State private var currentBahisTurleri: [String] = []
-    @State private var selectedRace: Race? = nil
     @State private var raceInfo: String = ""
 
     
@@ -363,14 +333,6 @@ extension OddsView {
         .frame(height: 35)
         .background(Color(white: 0.9))
         .foregroundColor(.black)
-        .task {
-            raceInfo = await fetchRaceInfo(selectedRun, selectedCity, selectedDate)
-        }
-        .onChange(of: selectedRun) {
-            Task {
-                raceInfo = await fetchRaceInfo(selectedRun, selectedCity, selectedDate)
-            }
-        }
     }
     
     private var dynamicTableHeader: some View {
@@ -408,7 +370,7 @@ extension OddsView {
             ScrollView {
                 VStack(spacing: 0) {
                     if tableRows.isEmpty && !isLoading {
-                        emptyStateView(message: "\(turkishDateString) tarihi için muhtemeller henüz yayınlanmamıştır.")
+                        emptyStateView(message: "Muhtemeller verisi henüz yayınlanmamıştır.")
                     } else {
                         tableContent
                     }
@@ -430,21 +392,6 @@ extension OddsView {
             .tint(.orange)
     }
     
-    private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Spacer(minLength: 80)
-            
-            Image(systemName: "doc.text.magnifyingglass")
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.3))
-            
-            Text("\(turkishDateString) tarihi için muhtemeller henüz yayınlanmamıştır.")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-    }
     
     private var tableContent: some View {
         VStack(spacing: 0) {
@@ -466,10 +413,14 @@ extension OddsView {
         HStack(spacing: 0) {
             ForEach(0..<row.cells.count, id: \.self) { index in
                 cellView(for: row, at: index)
-                if index < row.cells.count - 1 && !isCellEmpty(row: row, fromIndex: index) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 1.5)
+    
+                if index < row.cells.count - 1 {
+                    let currentEmpty = row.cells[index].label.isEmpty && row.cells[index].odds.isEmpty
+                    if !currentEmpty {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 1.5)
+                    }
                 }
             }
         }
@@ -506,43 +457,49 @@ extension OddsView {
         
         return VStack(spacing: 0) {
             if !isEmpty {
-                HStack(spacing: 4) {
+                HStack(spacing: 2) {
                     if shouldShowAsFavori {
                         Text(cell.label)
                             .font(.system(size: calculateSize(for: cell.label), weight: .bold))
                             .foregroundColor(.green)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .modifier(PulseModifier())
                     } else {
                         Text(cell.label)
                             .font(.system(size: calculateSize(for: cell.label), weight: .bold))
                             .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     
                     if shouldShowEkuriIcon(for: row, at: index) {
                         ekuriIcon(for: row)
                     }
                     
-                    Spacer()
+                    Spacer(minLength: 2)
                     
                     Text(cell.odds)
                         .font(.system(size: calculateSize(for: cell.odds), design: .monospaced))
                         .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .modifier(shouldShowAsFavori ? PulseModifier() : PulseModifier(active: false))
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                
+                // Yatay çizgi sadece hücre doluysa gösterilir
+                Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
             } else {
+                // Boş hücrede hiçbir şey (çizgi dahil) gösterilmez
                 Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            
-            Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
         }
         .background(
             isEmpty ? Color.clear : (isGanyanColumn && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
         )
     }
-                
-     
     
     private func calculateSize(for odds: String) -> CGFloat {
         let length = odds.count
@@ -644,28 +601,67 @@ extension OddsView {
         }
     }
     
+    
     func fetchRaceDetails() async {
         guard let city = selectedCity else { return }
-        let raceKey = "\(city)-\(selectedRun)"
-        guard let hash = runsData[raceKey]?.first else { return }
+        
+        await MainActor.run { isLoading = true }
+        
+        async let raceDetailTask = fetchMuhtemeller(for: city, run: selectedRun)
+        async let raceInfoTask = fetchProgramInfo(for: city, run: selectedRun)
+        
+        do {
+            let (details, info) = try await (raceDetailTask, raceInfoTask)
+            
+            await MainActor.run {
+                self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
+                self.raceStatus = details.data?.muhtemeller?.durum ?? ""
+                self.raceInfo = info
+                parseDataToRows(bahisler: details.data?.muhtemeller?.bahisler ?? [])
+                self.isLoading = false
+            }
+        } catch {
+            print("Failed to fetch race details: \(error)")
+            await MainActor.run {
+                self.tableRows = []
+                self.raceInfo = "Veri yüklenemedi."
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func fetchMuhtemeller(for city: String, run: Int) async throws -> RaceDetailResponse {
+        let raceKey = "\(city)-\(run)"
+        guard let hash = runsData[raceKey]?.first else { throw URLError(.badURL) }
         
         let f = DateFormatter(); f.dateFormat = "yyyy/MM/dd"
         let urlString = "https://vhs-medya-cdn.tjk.org/muhtemeller/s/\(f.string(from: selectedDate))/\(raceKey)-\(hash).json"
         
-        await MainActor.run { isLoading = true }
+        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
         
-        guard let url = URL(string: urlString),
-              let (data, _) = try? await URLSession.shared.data(from: url),
-              let decoded = try? JSONDecoder().decode(RaceDetailResponse.self, from: data) else {
-            await MainActor.run { isLoading = false }; return
-        }
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let decoded = try JSONDecoder().decode(RaceDetailResponse.self, from: data)
+        return decoded
+    }
+    
+    private func fetchProgramInfo(for city: String, run: Int) async throws -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd"
+        let dateString = formatter.string(from: selectedDate)
         
-        await MainActor.run {
-            self.raceTime = decoded.data?.muhtemeller?.saat ?? "--:--"
-            self.raceStatus = decoded.data?.muhtemeller?.durum ?? ""
-            parseDataToRows(bahisler: decoded.data?.muhtemeller?.bahisler ?? [])
-            isLoading = false
+        let urlString = "https://ebayi.tjk.org/s/d/program/\(dateString)/full/\(city).json"
+        
+        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let decoded = try JSONDecoder().decode(ProgramResponse.self, from: data)
+        
+        if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
+            return [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist]
+                .compactMap { $0 }
+                .joined(separator: ", ")
         }
+        return ""
     }
     
     func parseDataToRows(bahisler: [Bahis]) {
@@ -719,6 +715,6 @@ extension OddsView {
 }
 
 #Preview {
-    OddsView(selectedDate: Date().addingTimeInterval(-86400))
+    OddsView(selectedDate: Date())
         .preferredColorScheme(.light)
 }
