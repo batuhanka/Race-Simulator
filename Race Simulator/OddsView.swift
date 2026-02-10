@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Models
 struct ChecksumResponse: Codable {
     let runs: [String: [String]]?
     let success: Bool
@@ -22,7 +23,6 @@ struct DynamicTableRow: Identifiable {
     let ekuriGrubu: String
     var cells: [TableCell]
 }
-
 
 struct TableCell {
     let label: String
@@ -95,7 +95,7 @@ struct Kosul: Codable {
     }
 }
 
-// MARK: - Ana View
+// MARK: - Main View
 struct OddsView: View {
     let selectedDate: Date
     @State private var selectedTab: Int = 0
@@ -106,11 +106,17 @@ struct OddsView: View {
     @State private var isLoading = false
     @State private var raceTime: String = ""
     @State private var raceStatus: String = ""
+    
+    // Muhtemeller Data
     @State private var tableRows: [DynamicTableRow] = []
     @State private var currentBahisTurleri: [String] = []
+    
+    // AGF Data
+    @State private var agfTableRows: [DynamicTableRow] = []
+    @State private var agfBahisTurleri: [String] = ["#", "At", "Jokey", "AGF"]
+    
     @State private var raceInfo: String = ""
 
-    
     private var turkishDateString: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "tr_TR")
@@ -127,16 +133,12 @@ struct OddsView: View {
             } else if cities.isEmpty {
                 emptyStateView(message: "Seçilen tarih için henüz muhtemeller yayınlanmamıştır.")
             } else {
-                tabSelectionBar
                 runSelectionBar
-                
-                if selectedTab == 0 {
-                    statusInfoBar
-                    dynamicTableHeader
-                    dynamicMainList
-                } else {
-                    agfPlaceholderView
-                }
+                tabSelectionBar
+                Spacer()
+                statusInfoBar
+                dynamicTableHeader
+                dynamicMainList
             }
         }
         .background(Color(white: 0.12))
@@ -146,8 +148,7 @@ struct OddsView: View {
     }
 }
 
-
-// MARK: - View Bileşenleri
+// MARK: - View Components
 extension OddsView {
     
     private func emptyStateView(message: String) -> some View {
@@ -156,7 +157,6 @@ extension OddsView {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 60))
                 .foregroundColor(.gray.opacity(0.3))
-            
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.gray)
@@ -166,25 +166,6 @@ extension OddsView {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
-    private var agfPlaceholderView: some View {
-        VStack {
-            Spacer()
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 50))
-                .foregroundColor(.gray.opacity(0.3))
-                .padding(.bottom, 10)
-            Text("At Yarışı Genel Favorileri (AGF)")
-                .font(.headline)
-                .foregroundColor(.gray)
-            Text("Bu veri yakında aktif olacaktır.")
-                .font(.caption)
-                .foregroundColor(.gray.opacity(0.6))
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-    
     
     private var citySelectionBar: some View {
         HStack {
@@ -198,7 +179,7 @@ extension OddsView {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Text(selectedCity ?? "")
+                    Text(selectedCity ?? "Şehir Seçin")
                         .font(.system(size: 18, weight: .bold))
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12))
@@ -217,44 +198,29 @@ extension OddsView {
     
     private var tabSelectionBar: some View {
         HStack(spacing: 0) {
-            Button {
-                selectedTab = 0
-            } label: {
-                Text("Muhtemeller")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(selectedTab == 0 ? .orange : .gray)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Color(white: 0.12))
-                    .overlay(
-                        Rectangle()
-                            .fill(selectedTab == 0 ? Color.orange : Color.clear)
-                            .frame(height: 3),
-                        alignment: .bottom
-                    )
-            }
-            .buttonStyle(.plain)
-            
-            Button {
-                selectedTab = 1
-            } label: {
-                Text("AGF")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(selectedTab == 1 ? .orange : .gray)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Color(white: 0.12))
-                    .overlay(
-                        Rectangle()
-                            .fill(selectedTab == 1 ? Color.orange : Color.clear)
-                            .frame(height: 3),
-                        alignment: .bottom
-                    )
-            }
-            .buttonStyle(.plain)
+            tabButton(title: "Muhtemeller", index: 0)
+            tabButton(title: "AGF", index: 1)
         }
         .background(Color.black)
         .overlay(Divider(), alignment: .bottom)
+    }
+    
+    private func tabButton(title: String, index: Int) -> some View {
+        Button { selectedTab = index } label: {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(selectedTab == index ? .orange : .gray)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color(white: 0.12))
+                .overlay(
+                    Rectangle()
+                        .fill(selectedTab == index ? Color.orange : Color.clear)
+                        .frame(height: 3),
+                    alignment: .bottom
+                )
+        }
+        .buttonStyle(.plain)
     }
     
     private var runSelectionBar: some View {
@@ -268,8 +234,6 @@ extension OddsView {
         return HStack(spacing: 4) {
             ForEach(0..<matchingKeys.count, id: \.self) { index in
                 let kosuNo = "\(index + 1)"
-                let buttonColors = [Color.orange, Color.orange.opacity(0.8)]
-                
                 Button {
                     selectedRun = index + 1
                     Task { await fetchRaceDetails() }
@@ -279,15 +243,7 @@ extension OddsView {
                         .foregroundColor(selectedRun == (index + 1) ? .black : .white.opacity(0.8))
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
-                        .background(
-                            Group {
-                                if selectedRun == (index + 1) {
-                                    LinearGradient(colors: buttonColors, startPoint: .top, endPoint: .bottom)
-                                } else {
-                                    Color.white.opacity(0.12)
-                                }
-                            }
-                        )
+                        .background(selectedRun == (index + 1) ? Color.orange : Color.white.opacity(0.12))
                         .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
@@ -296,29 +252,6 @@ extension OddsView {
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
         .background(Color(white: 0.12))
-    }
-    
-    private func fetchRaceInfo(_ run: Int, _ city: String?, _ date: Date) async -> String {
-        guard let city = city else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd"
-        let dateString = formatter.string(from: date)
-
-        let urlString = "https://ebayi.tjk.org/s/d/program/\(dateString)/full/\(city).json"
-
-        guard let url = URL(string: urlString),
-              let (data, _) = try? await URLSession.shared.data(from: url),
-              let decoded = try? JSONDecoder().decode(ProgramResponse.self, from: data) else {
-            return ""
-        }
-
-        if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
-            let merged = [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist]
-                .compactMap{ $0 }
-                .joined(separator: ", ")
-            return merged.isEmpty ? "" : merged
-        }
-        return ""
     }
     
     private var statusInfoBar: some View {
@@ -336,90 +269,69 @@ extension OddsView {
     }
     
     private var dynamicTableHeader: some View {
-        Group {
-            if !tableRows.isEmpty {
+        let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
+        let rows = selectedTab == 0 ? tableRows : agfTableRows
+        
+        return Group {
+            if !rows.isEmpty {
                 HStack(spacing: 0) {
-                    ForEach(0..<currentBahisTurleri.count, id: \.self) { index in
-                        Text(currentBahisTurleri[index])
+                    ForEach(0..<headers.count, id: \.self) { index in
+                        Text(headers[index])
                             .font(.system(size: 11, weight: .bold))
                             .frame(maxWidth: .infinity)
-                        if index < currentBahisTurleri.count - 1 {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 1.5)
+                        if index < headers.count - 1 {
+                            Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1.5)
                         }
                     }
                 }
                 .frame(height: 35)
                 .background(Color.white)
-                .overlay(VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 1.5)
-                    Spacer()
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 1.5)
-                })
+                .overlay(Divider(), alignment: .bottom)
             }
         }
     }
     
     private var dynamicMainList: some View {
-        ZStack {
+        let rows = selectedTab == 0 ? tableRows : agfTableRows
+        
+        return ZStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    if tableRows.isEmpty && !isLoading {
-                        emptyStateView(message: "Muhtemeller verisi henüz yayınlanmamıştır.")
+                    if rows.isEmpty && !isLoading {
+                        emptyStateView(message: "\(selectedTab == 0 ? "Muhtemeller" : "AGF") verisi henüz yayınlanmamıştır.")
                     } else {
-                        tableContent
+                        tableContent(for: rows)
                     }
                 }
             }
-            
-            if isLoading && !tableRows.isEmpty {
-                Color.black.opacity(0.2)
-                    .edgesIgnoringSafeArea(.all)
-                ProgressView()
-                    .tint(.orange)
+            if isLoading && !rows.isEmpty {
+                Color.black.opacity(0.2).edgesIgnoringSafeArea(.all)
+                ProgressView().tint(.orange)
             }
         }
     }
     
     private var loadingView: some View {
-        ProgressView()
-            .padding(.top, 100)
-            .tint(.orange)
+        ProgressView().padding(.top, 100).tint(.orange)
     }
     
-    
-    private var tableContent: some View {
+    private func tableContent(for rows: [DynamicTableRow]) -> some View {
         VStack(spacing: 0) {
-            let visibleRows = tableRows.filter { hasAnyContent(in: $0) }
-            
-            ForEach(visibleRows, id: \.id) { row in
-                        rowView(for: row)
-                    }
-            
+            ForEach(rows) { row in
+                rowView(for: row)
+            }
             Color.clear.frame(height: 60)
         }
-    }
-    
-    private func hasAnyContent(in row: DynamicTableRow) -> Bool {
-        return row.cells.contains { !$0.label.isEmpty || !$0.odds.isEmpty }
     }
     
     private func rowView(for row: DynamicTableRow) -> some View {
         HStack(spacing: 0) {
             ForEach(0..<row.cells.count, id: \.self) { index in
                 cellView(for: row, at: index)
-    
                 if index < row.cells.count - 1 {
                     let currentEmpty = row.cells[index].label.isEmpty && row.cells[index].odds.isEmpty
                     if !currentEmpty {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 1.5)
+                        Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1.5)
                     }
                 }
             }
@@ -427,205 +339,115 @@ extension OddsView {
         .frame(height: 48)
     }
     
-    struct PulseModifier: ViewModifier {
-        var active: Bool = true
-        @State private var opacity: Double = 1.0
-        
-        func body(content: Content) -> some View {
-            content
-                .opacity(opacity)
-                .onAppear {
-                    if active {
-                        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-                            opacity = 0.3
-                        }
-                    }
-                }
-        }
-    }
-    
     private func cellView(for row: DynamicTableRow, at index: Int) -> some View {
         let cell = row.cells[index]
         let isEmpty = cell.label.isEmpty && cell.odds.isEmpty
+        let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
         
-        let isGanyanColumn: Bool = {
-            guard index < currentBahisTurleri.count else { return false }
-            return currentBahisTurleri[index].uppercased().contains("GANYAN")
-        }()
+        let isGanyanColumn = index < headers.count && headers[index].uppercased().contains("GANYAN")
+        let isAGFColumn = selectedTab == 1 && headers[index].uppercased() == "AGF"
+        let shouldShowAsFavori = row.isFavori && (isGanyanColumn || isAGFColumn) && !row.isKosmaz
         
-        let shouldShowAsFavori = row.isFavori && isGanyanColumn
+        let isKosmazCell = row.isKosmaz && isGanyanColumn
         
         return VStack(spacing: 0) {
             if !isEmpty {
                 HStack(spacing: 2) {
-                    if shouldShowAsFavori {
-                        Text(cell.label)
-                            .font(.system(size: calculateSize(for: cell.label), weight: .bold))
-                            .foregroundColor(.green)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .modifier(PulseModifier())
-                    } else {
-                        Text(cell.label)
-                            .font(.system(size: calculateSize(for: cell.label), weight: .bold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+                    Text(cell.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     
-                    if shouldShowEkuriIcon(for: row, at: index) {
-                        ekuriIcon(for: row)
+                    if isGanyanColumn && !row.ekuriGrubu.isEmpty {
+                        ekuriIcon(for: row.ekuriGrubu)
                     }
                     
                     Spacer(minLength: 2)
                     
-                    Text(cell.odds)
-                        .font(.system(size: calculateSize(for: cell.odds), design: .monospaced))
-                        .foregroundColor(shouldShowAsFavori ? .green : .primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .modifier(shouldShowAsFavori ? PulseModifier() : PulseModifier(active: false))
+                    if isKosmazCell{
+                        Text("Koşmaz")
+                            .font(.system(size: 12))
+                            .foregroundColor(.black)
+                        
+                    }else{
+                        Text(cell.odds)
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .modifier(PulseModifier(active: shouldShowAsFavori))
+                    }
                 }
                 .padding(.horizontal, 4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                
-                // Yatay çizgi sadece hücre doluysa gösterilir
                 Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
             } else {
-                // Boş hücrede hiçbir şey (çizgi dahil) gösterilmez
                 Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .background(
-            isEmpty ? Color.clear : (isGanyanColumn && row.isKosmaz ? Color.gray.opacity(0.8) : Color.white)
-        )
+        .background(isEmpty ? Color.clear : (isKosmazCell ? Color.gray.opacity(0.8) : Color.white))
     }
-    
-    private func calculateSize(for odds: String) -> CGFloat {
-        let length = odds.count
-        if length > 6 {
-            return 10
-        } else if length > 5 {
-            return 11
-        }
-        return 14
-    }
-    
-    private func isCellEmpty(row: DynamicTableRow, fromIndex: Int) -> Bool {
-        let currentEmpty = row.cells[fromIndex].label.isEmpty && row.cells[fromIndex].odds.isEmpty
-        let nextEmpty = fromIndex + 1 < row.cells.count &&
-        row.cells[fromIndex + 1].label.isEmpty &&
-        row.cells[fromIndex + 1].odds.isEmpty
-        
-        return currentEmpty && nextEmpty
-    }
-    
-    private func shouldShowEkuriIcon(for row: DynamicTableRow, at index: Int) -> Bool {
-        guard index < currentBahisTurleri.count else { return false }
-        let tur = currentBahisTurleri[index].trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let hasEkuri = !row.ekuriGrubu.isEmpty
-        let isGanyanColumn = tur.contains("GANYAN")
-        return isGanyanColumn && hasEkuri
-    }
-    
-    private func ekuriIcon(for row: DynamicTableRow) -> some View {
-        let urlString = "https://medya-cdn.tjk.org/imageftp/Img/\(row.ekuriGrubu).gif"
-        
-        return AsyncImage(url: URL(string: urlString)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-            case .failure:
-                Color.clear
-            case .empty:
-                ProgressView().scaleEffect(0.5)
-            @unknown default:
-                EmptyView()
-            }
+
+    private func ekuriIcon(for ekuri: String) -> some View {
+        AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/\(ekuri).gif")) { phase in
+            if let image = phase.image { image.resizable().scaledToFit() } else { Color.clear }
         }
         .frame(width: 14, height: 14)
-    }
-    
-    private func labelColor(for row: DynamicTableRow, at index: Int) -> Color {
-        return (row.isFavori && index == 0) ? .green : .primary
-    }
-    
-    private func rowBackground(for row: DynamicTableRow) -> Color {
-        if row.isKosmaz {
-            return Color.gray.opacity(0.8)
-        }
-        return Color.white
     }
 }
 
 // MARK: - Data Fetching
 extension OddsView {
-    
     func loadInitialData() async {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd"
-        let dateString = formatter.string(from: selectedDate)
-        
-        let checksumFormatter = DateFormatter()
-        checksumFormatter.dateFormat = "yyyy/MM/dd"
-        let checksumPath = checksumFormatter.string(from: selectedDate)
-        
-        let urlString = "https://vhs-medya.tjk.org/muhtemeller/s/\(checksumPath)/checksum.json"
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
+        let dateStr = f.string(from: selectedDate)
+        let cf = DateFormatter(); cf.dateFormat = "yyyy/MM/dd"
+        let urlStr = "https://vhs-medya.tjk.org/muhtemeller/s/\(cf.string(from: selectedDate))/checksum.json"
         
         await MainActor.run { isLoading = true }
-        
-        let parser = JsonParser()
-        let localCities = (try? await parser.getRaceCities(raceDate: dateString)) ?? []
-        
-        guard let url = URL(string: urlString),
-              let (data, _) = try? await URLSession.shared.data(from: url),
-              let decoded = try? JSONDecoder().decode(ChecksumResponse.self, from: data) else {
-            await MainActor.run { isLoading = false }; return
-        }
-        
-        await MainActor.run {
-            self.runsData = decoded.runs ?? [:]
-            let allKeys = decoded.runs?.keys.map { $0 } ?? []
-            self.cities = Array(Set(allKeys.compactMap { key -> String? in
-                let cityName = key.components(separatedBy: "-").first ?? ""
-                return localCities.contains(cityName) ? cityName : nil
-            })).sorted()
+        do {
+            let parser = JsonParser()
+            let localCities = (try? await parser.getRaceCities(raceDate: dateStr)) ?? []
+            guard let url = URL(string: urlStr) else { return }
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let decoded = try JSONDecoder().decode(ChecksumResponse.self, from: data)
             
-            if selectedCity == nil || !cities.contains(selectedCity!) {
-                selectedCity = cities.first
+            await MainActor.run {
+                self.runsData = decoded.runs ?? [:]
+                let allKeys = decoded.runs?.keys.map { $0 } ?? []
+                self.cities = Array(Set(allKeys.compactMap { key -> String? in
+                    let cityName = key.components(separatedBy: "-").first ?? ""
+                    return localCities.contains(cityName) ? cityName : nil
+                })).sorted()
+                if selectedCity == nil || !cities.contains(selectedCity!) { selectedCity = cities.first }
+                isLoading = false
+                if selectedCity != nil { Task { await fetchRaceDetails() } }
             }
-            isLoading = false
-            if selectedCity != nil { Task { await fetchRaceDetails() } }
-        }
+        } catch { await MainActor.run { isLoading = false } }
     }
-    
     
     func fetchRaceDetails() async {
         guard let city = selectedCity else { return }
-        
         await MainActor.run { isLoading = true }
-        
-        async let raceDetailTask = fetchMuhtemeller(for: city, run: selectedRun)
-        async let raceInfoTask = fetchProgramInfo(for: city, run: selectedRun)
-        
         do {
-            let (details, info) = try await (raceDetailTask, raceInfoTask)
+            async let muhtemellerTask = fetchMuhtemeller(for: city, run: selectedRun)
+            async let infoTask = fetchProgramInfo(for: city, run: selectedRun)
+            // async let agfTask = fetchAGFData(for: city, run: selectedRun) // AGF verisi buraya gelecek
+            
+            let (details, info) = try await (muhtemellerTask, infoTask)
             
             await MainActor.run {
                 self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
                 self.raceStatus = details.data?.muhtemeller?.durum ?? ""
                 self.raceInfo = info
                 parseDataToRows(bahisler: details.data?.muhtemeller?.bahisler ?? [])
+                // parseAGFData(agfData) // AGF verisi gelince burası dolacak
                 self.isLoading = false
             }
         } catch {
-            print("Failed to fetch race details: \(error)")
             await MainActor.run {
-                self.tableRows = []
-                self.raceInfo = "Veri yüklenemedi."
-                self.isLoading = false
+                self.raceInfo = "Veri yüklenemedi"; self.tableRows = []; self.isLoading = false
             }
         }
     }
@@ -633,33 +455,21 @@ extension OddsView {
     private func fetchMuhtemeller(for city: String, run: Int) async throws -> RaceDetailResponse {
         let raceKey = "\(city)-\(run)"
         guard let hash = runsData[raceKey]?.first else { throw URLError(.badURL) }
-        
         let f = DateFormatter(); f.dateFormat = "yyyy/MM/dd"
-        let urlString = "https://vhs-medya-cdn.tjk.org/muhtemeller/s/\(f.string(from: selectedDate))/\(raceKey)-\(hash).json"
-        
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-        
+        let urlStr = "https://vhs-medya-cdn.tjk.org/muhtemeller/s/\(f.string(from: selectedDate))/\(raceKey)-\(hash).json"
+        guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
         let (data, _) = try await URLSession.shared.data(from: url)
-        let decoded = try JSONDecoder().decode(RaceDetailResponse.self, from: data)
-        return decoded
+        return try JSONDecoder().decode(RaceDetailResponse.self, from: data)
     }
     
     private func fetchProgramInfo(for city: String, run: Int) async throws -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd"
-        let dateString = formatter.string(from: selectedDate)
-        
-        let urlString = "https://ebayi.tjk.org/s/d/program/\(dateString)/full/\(city).json"
-        
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-        
+        let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
+        let urlStr = "https://ebayi.tjk.org/s/d/program/\(f.string(from: selectedDate))/full/\(city).json"
+        guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
         let (data, _) = try await URLSession.shared.data(from: url)
         let decoded = try JSONDecoder().decode(ProgramResponse.self, from: data)
-        
         if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
-            return [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist]
-                .compactMap { $0 }
-                .joined(separator: ", ")
+            return [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist].compactMap { $0 }.joined(separator: ", ")
         }
         return ""
     }
@@ -667,50 +477,38 @@ extension OddsView {
     func parseDataToRows(bahisler: [Bahis]) {
         let cleanBahisler = bahisler.filter { $0.tur != nil }
         self.currentBahisTurleri = cleanBahisler.compactMap { $0.tur }
-        
         let maxRows = cleanBahisler.map { $0.muhtemeller?.count ?? 0 }.max() ?? 0
         var newRows: [DynamicTableRow] = []
-        
         for i in 0..<maxRows {
-            var rowCells: [TableCell] = []
-            var favoriMi = false
-            var kosmazMi = false
-            var satirEkuri = ""
-            
+            var cells: [TableCell] = []
+            var isFavori = false, isKosmaz = false, ekuri = ""
             for bahis in cleanBahisler {
                 if let muhtemeller = bahis.muhtemeller, i < muhtemeller.count {
                     let m = muhtemeller[i]
-        
-                    if let eRaw = m.e {
-                        
-                        let eStr = String(describing: eRaw).trimmingCharacters(in: .whitespaces)
-                        if !eStr.isEmpty && eStr != "0" {
-                            satirEkuri = "e\(eStr)"
-                        }
+                    if let e = m.e, !e.isEmpty && e != "0" { ekuri = "e\(e)" }
+                    if bahis.tur?.uppercased().contains("GANYAN") == true {
+                        isFavori = m.a ?? false; isKosmaz = m.k ?? false
                     }
-                    
-                    if (bahis.tur?.uppercased().contains("GANYAN") == true) {
-                        favoriMi = m.a ?? false
-                        kosmazMi = m.k ?? false
-                    }
-                }
+                    let label = m.s2 != nil ? "\(m.s1 ?? "")-\(m.s2!)" : (m.s1 ?? "")
+                    cells.append(TableCell(label: label, odds: m.ganyan ?? ""))
+                } else { cells.append(TableCell(label: "", odds: "")) }
             }
-            
-            for bahis in cleanBahisler {
-                let muhtemeller = bahis.muhtemeller ?? []
-                if i < muhtemeller.count {
-                    let m = muhtemeller[i]
-                    let label = m.s2 != nil ? "\(m.s1 ?? "")-\(m.s2 ?? "")" : (m.s1 ?? "")
-                    let odds = m.k == true ? "K" : (m.ganyan ?? "-")
-                    rowCells.append(TableCell(label: label, odds: odds))
-                } else {
-                    rowCells.append(TableCell(label: "", odds: ""))
-                }
-            }
-            
-            newRows.append(DynamicTableRow(isFavori: favoriMi, isKosmaz: kosmazMi, ekuriGrubu: satirEkuri, cells: rowCells))
+            newRows.append(DynamicTableRow(isFavori: isFavori, isKosmaz: isKosmaz, ekuriGrubu: ekuri, cells: cells))
         }
         self.tableRows = newRows
+    }
+}
+
+// MARK: - Helpers
+struct PulseModifier: ViewModifier {
+    var active: Bool
+    @State private var opacity: Double = 1.0
+    func body(content: Content) -> some View {
+        content.opacity(opacity).onAppear {
+            if active {
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { opacity = 0.4 }
+            }
+        }
     }
 }
 
