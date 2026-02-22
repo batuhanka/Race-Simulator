@@ -114,8 +114,23 @@ struct MainView: View {
                 }
             }
             .navigationDestination(isPresented: $showSimulation) {
-                // Buraya simülasyon sayfanızın View'ını koyabilirsiniz.
-                Text("Simülasyon Sayfası")
+                if races.isEmpty {
+                    // Eğer o güne ait hiç şehir yoksa
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 50))
+                            .foregroundColor(.yellow)
+                        Text("Seçili tarihte yarış programı bulunamadı.")
+                            .foregroundColor(.white)
+                    }
+                } else {
+                    // Simülasyon Kurulum (Setup) ekranına yönlendir
+                    SimulationSetupView(
+                        selectedDate: selectedDate,
+                        availableCities: races,
+                        initialCity: selectedRace // Eğer MainView'da zaten bir şehir seçiliyse onu aktarır
+                    )
+                }
             }
             .onAppear {
                 fetchRaces()
@@ -260,7 +275,6 @@ struct MainView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 25)
             }
-            // BOYUTLAR: RaceCardButton ile birebir aynı
             .frame(height: 110)
             .frame(maxWidth: .infinity)
             .background(Color.gray.opacity(0.2))
@@ -271,7 +285,7 @@ struct MainView: View {
             )
             .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 6)
         }
-        .buttonStyle(CardPressEffectStyle()) // Aynı basma efekti
+        .buttonStyle(CardPressEffectStyle())
     }
     
     // MARK: - LOGIC

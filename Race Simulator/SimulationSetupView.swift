@@ -1,3 +1,11 @@
+//
+//  SimulationSetupView.swift
+//  Race Simulator
+//
+//  Created by Batuhan KANDIRAN on 23.02.2026.
+//
+
+
 import SwiftUI
 
 struct SimulationSetupView: View {

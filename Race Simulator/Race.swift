@@ -122,4 +122,44 @@ struct Race: Decodable, Identifiable {
         return false
     }
     
+    
+    // Race.swift içine eklenecek manuel başlatıcı
+    init(
+        KOD: String,
+        RACENO: String? = nil,
+        SAAT: String? = nil,
+        BILGI_TR: String? = nil,
+        PIST: String? = nil,
+        MESAFE: String? = nil,
+        atlar: [Horse]? = nil
+    ) {
+        self.KOD = KOD
+        self.RACENO = RACENO
+        self.SAAT = SAAT
+        self.BILGI_TR = BILGI_TR
+        self.PIST = PIST
+        self.MESAFE = MESAFE
+        self.atlar = atlar
+        
+        // Zorunlu Bool alanları varsayılan değerlerle dolduruyoruz
+        self.ONEMLIKOSUADI_TR = false
+        self.ONEMLIKOSUADI_EN = false
+        self.OZELADI = false
+        self.APRANTI = false
+        self.hasSatisbedeli = false
+        self.hasNonRunner = false
+        
+        // Diğer opsiyonelleri nil bırakıyoruz
+        self.NO = nil; self.TARIH = nil; self.PISTADI_TR = nil; self.PISTADI_EN = nil
+        self.ActiveClass = nil; self.KISALTMA = nil; self.GRUP_TR = nil; self.GRUP_EN = nil
+        self.GRUPKISA = nil; self.CINSDETAY_TR = nil; self.CINSDETAY_EN = nil; self.CINSIYET = nil
+        self.BILGI_EN = nil; self.ENIYIDERECE = nil; self.ENIYIDERECEACIKLAMA = nil
+        self.SON800 = nil; self.DOVIZ = nil; self.ikramiyeler = nil; self.primler = nil
+        self.BAHISLER_TR = nil; self.BAHISLER_EN = nil; self.emiParasalNeticeler_tr = nil
+        self.emiParasalNeticeler_en = nil; self.emiParasalNeticelerAgfResults = nil
+        self.FOTOFINISH = nil; self.VIDEO = nil; self.emiVideoFile = nil; self.emiVideoUrl = nil
+        self.emiPhotoFile = nil; self.emiFotoUrl = nil; self.emiRunDate = nil
+    }
+    
+    
 }
