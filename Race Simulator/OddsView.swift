@@ -75,6 +75,40 @@ struct BahisOran: Codable {
 
 struct ProgramResponse: Codable {
     let kosular: [Kosul]?
+    let agf: [AGFGrubu]?
+}
+
+struct AGFGrubu: Codable {
+    let bahis: String?
+    let kosular: [AGFKosu]?
+    
+    enum CodingKeys: String, CodingKey {
+        case bahis = "BAHIS", kosular
+    }
+}
+
+struct AGFKosu: Codable {
+    let no: String?
+    let atlar: [AGFAt]?
+    
+    enum CodingKeys: String, CodingKey {
+        case no = "NO", atlar
+    }
+}
+
+struct AGFAt: Codable {
+    let no: String?
+    let ad: String?
+    let jokey: String?
+    let agfOran: String?
+    let agfSiraNo: Int?
+    let kosmaz: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case no = "NO", ad = "AD", jokey = "JOKEY"
+        case agfOran = "AGFORAN", agfSiraNo = "AGFSIRANO"
+        case kosmaz = "KOSMAZ"
+    }
 }
 
 struct Kosul: Codable {
@@ -137,8 +171,8 @@ struct OddsView: View {
                 tabSelectionBar
                 Spacer()
                 statusInfoBar
-                dynamicTableHeader
-                dynamicMainList
+                dynamicTableHeader.padding(.horizontal, 8)
+                dynamicMainList.padding(.horizontal, 8)
             }
         }
         .background(Color(white: 0.12))
@@ -274,13 +308,16 @@ extension OddsView {
         
         return Group {
             if !rows.isEmpty {
-                HStack(spacing: 0) {
-                    ForEach(0..<headers.count, id: \.self) { index in
-                        Text(headers[index])
-                            .font(.system(size: 11, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                        if index < headers.count - 1 {
-                            Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1.5)
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        ForEach(0..<headers.count, id: \.self) { index in
+                            Text(headers[index])
+                                .font(.system(size: 11, weight: .bold))
+                                .frame(width: columnWidth(for: index, totalWidth: geometry.size.width))
+                            
+                            if index < headers.count - 1 {
+                                Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1)
+                            }
                         }
                     }
                 }
@@ -295,12 +332,14 @@ extension OddsView {
         let rows = selectedTab == 0 ? tableRows : agfTableRows
         
         return ZStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    if rows.isEmpty && !isLoading {
-                        emptyStateView(message: "\(selectedTab == 0 ? "Muhtemeller" : "AGF") verisi henüz yayınlanmamıştır.")
-                    } else {
-                        tableContent(for: rows)
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if rows.isEmpty && !isLoading {
+                            emptyStateView(message: "\(selectedTab == 0 ? "Muhtemeller" : "AGF") verisi henüz yayınlanmamıştır.")
+                        } else {
+                            tableContent(for: rows, totalWidth: geometry.size.width)
+                        }
                     }
                 }
             }
@@ -315,19 +354,20 @@ extension OddsView {
         ProgressView().padding(.top, 100).tint(.orange)
     }
     
-    private func tableContent(for rows: [DynamicTableRow]) -> some View {
+    private func tableContent(for rows: [DynamicTableRow], totalWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             ForEach(rows) { row in
-                rowView(for: row)
+                rowView(for: row, totalWidth: totalWidth)
             }
             Color.clear.frame(height: 60)
         }
     }
     
-    private func rowView(for row: DynamicTableRow) -> some View {
+    private func rowView(for row: DynamicTableRow, totalWidth: CGFloat) -> some View {
         HStack(spacing: 0) {
             ForEach(0..<row.cells.count, id: \.self) { index in
-                cellView(for: row, at: index)
+                cellView(for: row, at: index, totalWidth: totalWidth)
+                
                 if index < row.cells.count - 1 {
                     let currentEmpty = row.cells[index].label.isEmpty && row.cells[index].odds.isEmpty
                     if !currentEmpty {
@@ -339,54 +379,76 @@ extension OddsView {
         .frame(height: 48)
     }
     
-    private func cellView(for row: DynamicTableRow, at index: Int) -> some View {
+    private func columnWidth(for index: Int, totalWidth: CGFloat) -> CGFloat {
+        let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
+        guard !headers.isEmpty else { return 0 }
+        
+        if selectedTab == 1 {
+            switch index {
+            case 0: return 35
+            case 1: return (totalWidth - 35) * 0.40
+            case 2: return (totalWidth - 35) * 0.35
+            case 3: return (totalWidth - 35) * 0.25
+            default: return totalWidth / CGFloat(headers.count)
+            }
+        }
+        
+        return totalWidth / CGFloat(headers.count)
+    }
+    
+    private func cellView(for row: DynamicTableRow, at index: Int, totalWidth: CGFloat) -> some View {
         let cell = row.cells[index]
         let isEmpty = cell.label.isEmpty && cell.odds.isEmpty
         let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
         
         let isGanyanColumn = index < headers.count && headers[index].uppercased().contains("GANYAN")
-        let isAGFColumn = selectedTab == 1 && headers[index].uppercased() == "AGF"
+        let isAGFColumn = selectedTab == 1 && index < headers.count && headers[index].uppercased() == "AGF"
+        let isAGFAtColumn = selectedTab == 1 && index == 1
         let shouldShowAsFavori = row.isFavori && (isGanyanColumn || isAGFColumn) && !row.isKosmaz
+        let isKosmazCell = row.isKosmaz && (isGanyanColumn || (selectedTab == 1))
         
-        let isKosmazCell = row.isKosmaz && isGanyanColumn
-        
-        return VStack(spacing: 0) {
-            if !isEmpty {
-                HStack(spacing: 2) {
-                    Text(cell.label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(shouldShowAsFavori ? .green : .primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    
-                    if isGanyanColumn && !row.ekuriGrubu.isEmpty {
-                        ekuriIcon(for: row.ekuriGrubu)
-                    }
-                    
-                    Spacer(minLength: 2)
-                    
-                    if isKosmazCell{
-                        Text("Koşmaz")
-                            .font(.system(size: 12))
-                            .foregroundColor(.black)
-                        
-                    }else{
-                        Text(cell.odds)
-                            .font(.system(size: 13, design: .monospaced))
-                            .foregroundColor(shouldShowAsFavori ? .green : .primary)
+        let viewContent =
+            VStack(spacing: 0) {
+                if !isEmpty {
+                    HStack(spacing: 2) {
+                        Text(cell.label)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
                             .lineLimit(1)
+                            .padding(.leading, (selectedTab == 1 && index == 1) ? 4 : 0)
                             .minimumScaleFactor(0.7)
-                            .modifier(PulseModifier(active: shouldShowAsFavori))
+                        
+                        if (isGanyanColumn || isAGFAtColumn) && !row.ekuriGrubu.isEmpty {
+                            ekuriIcon(for: row.ekuriGrubu)
+                        }
+                        
+                        Spacer(minLength: 2)
+                        
+                        if isKosmazCell && (isGanyanColumn || isAGFColumn) {
+                            Text("Koşmaz")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.black)
+                        } else {
+                            Text(cell.odds)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .modifier(PulseModifier(active: shouldShowAsFavori))
+                        }
                     }
+                    .padding(.horizontal, 4)
+                    .frame(maxHeight: .infinity)
+                    
+                    Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
+                } else {
+                    Color.clear
                 }
-                .padding(.horizontal, 4)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
-            } else {
-                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        }
-        .background(isEmpty ? Color.clear : (isKosmazCell ? Color.gray.opacity(0.8) : Color.white))
+
+        return viewContent
+            .frame(width: columnWidth(for: index, totalWidth: totalWidth))
+            .background(isEmpty ? Color.clear : (isKosmazCell ? Color.gray.opacity(0.6) : Color.white))
     }
 
     private func ekuriIcon(for ekuri: String) -> some View {
@@ -433,21 +495,33 @@ extension OddsView {
         do {
             async let muhtemellerTask = fetchMuhtemeller(for: city, run: selectedRun)
             async let infoTask = fetchProgramInfo(for: city, run: selectedRun)
-            // async let agfTask = fetchAGFData(for: city, run: selectedRun) // AGF verisi buraya gelecek
             
-            let (details, info) = try await (muhtemellerTask, infoTask)
-            
+            let (details, programResult) = try await (muhtemellerTask, infoTask)
+
             await MainActor.run {
                 self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
                 self.raceStatus = details.data?.muhtemeller?.durum ?? ""
-                self.raceInfo = info
-                parseDataToRows(bahisler: details.data?.muhtemeller?.bahisler ?? [])
-                // parseAGFData(agfData) // AGF verisi gelince burası dolacak
+                self.raceInfo = programResult.info
+                
+                let bahisler = details.data?.muhtemeller?.bahisler ?? []
+                var ekuriMap: [String: String] = [:]
+                if let ganyanBahis = bahisler.first(where: { $0.tur?.uppercased().contains("GANYAN") == true }),
+                   let muhtemeller = ganyanBahis.muhtemeller {
+                    for m in muhtemeller {
+                        if let horseNo = m.s1, let ekuri = m.e, !ekuri.isEmpty, ekuri != "0" {
+                            ekuriMap[horseNo] = "e\(ekuri)"
+                        }
+                    }
+                }
+            
+                parseDataToRows(bahisler: bahisler)
+                parseAGFData(from: programResult.fullResponse, ekuriMap: ekuriMap)
+                
                 self.isLoading = false
             }
         } catch {
             await MainActor.run {
-                self.raceInfo = "Veri yüklenemedi"; self.tableRows = []; self.isLoading = false
+                self.raceInfo = "Veri yüklenemedi"; self.tableRows = []; self.agfTableRows = []; self.isLoading = false
             }
         }
     }
@@ -462,16 +536,55 @@ extension OddsView {
         return try JSONDecoder().decode(RaceDetailResponse.self, from: data)
     }
     
-    private func fetchProgramInfo(for city: String, run: Int) async throws -> String {
+    private func fetchProgramInfo(for city: String, run: Int) async throws -> (info: String, fullResponse: ProgramResponse) {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
         let urlStr = "https://ebayi.tjk.org/s/d/program/\(f.string(from: selectedDate))/full/\(city).json"
         guard let url = URL(string: urlStr) else { throw URLError(.badURL) }
+        
         let (data, _) = try await URLSession.shared.data(from: url)
         let decoded = try JSONDecoder().decode(ProgramResponse.self, from: data)
+        
+        var infoStr = ""
         if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
-            return [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist].compactMap { $0 }.joined(separator: ", ")
+            infoStr = [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist].compactMap { $0 }.joined(separator: ", ")
         }
-        return ""
+        
+        return (infoStr, decoded)
+    }
+    
+    func parseAGFData(from program: ProgramResponse, ekuriMap: [String: String]) {
+        guard let agfGruplari = program.agf else {
+            self.agfTableRows = []
+            return
+        }
+        
+       let matchingKosu = agfGruplari
+            .compactMap { $0.kosular }
+            .joined()
+            .first(where: { $0.no == String(selectedRun) })
+        
+        guard let atlar = matchingKosu?.atlar else {
+            self.agfTableRows = []
+            return
+        }
+        
+        self.agfTableRows = atlar.map { at in
+            let cells = [
+                TableCell(label: at.no ?? "", odds: ""),
+                TableCell(label: at.ad ?? "", odds: ""),
+                TableCell(label: at.jokey ?? "", odds: ""),
+                TableCell(label: "", odds: "%" + (at.agfOran ?? "0"))
+            ]
+            
+            let horseNo = at.no ?? ""
+            
+            return DynamicTableRow(
+                isFavori: at.agfSiraNo == 1,
+                isKosmaz: at.kosmaz ?? false,
+                ekuriGrubu: ekuriMap[horseNo] ?? "",
+                cells: cells
+            )
+        }
     }
     
     func parseDataToRows(bahisler: [Bahis]) {

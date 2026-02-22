@@ -20,7 +20,7 @@ struct CustomBottomBar: View {
                 .fill(Color.white.opacity(0.08))
                 .frame(height: 0.1)
 
-            HStack(alignment: .center, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
 
                 BottomTabItem(
                     icon: "house.fill",
@@ -30,7 +30,7 @@ struct CustomBottomBar: View {
                 ).id("tab_0")
 
                 BottomTabItem(
-                    icon: "list.bullet.rectangle",
+                    icon: "newspaper.fill",
                     title: "Program",
                     active: selectedBottomTab == 1,
                     action: { selectedBottomTab = 1 }
@@ -44,8 +44,8 @@ struct CustomBottomBar: View {
                 ).id("tab_2")
                 
                 BottomTabItem(
-                    icon: "list.clipboard.fill",
-                    title: "Muhtemeller",
+                    icon: "tablecells.fill",
+                    title: "AGF",
                     active: selectedBottomTab == 3,
                     action: { selectedBottomTab = 3 }
                 ).id("tab_3")
@@ -61,13 +61,14 @@ struct CustomBottomBar: View {
             .padding(.vertical, 8)
             .padding(.horizontal, 2)
             .background(Color.black.opacity(0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 25, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 40, style: .continuous)
+                RoundedRectangle(cornerRadius: 25, style: .continuous)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             )
         }
-        .padding(.bottom, 2)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
         .ignoresSafeArea(.container, edges: .bottom)
     }
 }
@@ -87,12 +88,13 @@ struct BottomTabItem: View {
                 action()
             }
         }) {
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
+                    .frame(height: 22)
                 
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 11, weight: .medium))
             }
             .frame(maxWidth: .infinity)
             .foregroundColor(active ? .cyan : .gray)
@@ -101,7 +103,7 @@ struct BottomTabItem: View {
             .background(
                 active ? Color.cyan.opacity(0.15) : Color.clear
             )
-            .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .transition(.scale.combined(with: .opacity))
         }
         .buttonStyle(.plain)
@@ -109,5 +111,5 @@ struct BottomTabItem: View {
 }
 
 #Preview {
-    CustomBottomBar(selectedBottomTab: .constant(1))
+    CustomBottomBar(selectedBottomTab: .constant(3))
 }
