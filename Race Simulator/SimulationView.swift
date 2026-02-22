@@ -5,7 +5,7 @@ struct SimulationView: View {
     // MARK: - PROPERTIES
     let raceCity: String
     let havaData: HavaData
-    let kosu: Race // SADECE TEK BİR KOŞU ALIYORUZ
+    let kosu: Race
     
     @Environment(\.dismiss) var dismiss
     @State private var isSimulating: Bool = false
@@ -37,21 +37,9 @@ struct SimulationView: View {
         .navigationBarHidden(true)
         .onAppear {
             setupHorses()
-            AppDelegate.orientationLock = .landscape
-            updateOrientation(to: .landscapeRight)
-        }
-        .onDisappear {
-            AppDelegate.orientationLock = .portrait
-            updateOrientation(to: .portrait)
         }
     }
     
-    // MARK: - ORIENTATION LOGIC
-    private func updateOrientation(to orientation: UIInterfaceOrientationMask) {
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation))
-        }
-    }
 }
 
 // MARK: - COMPONENTS

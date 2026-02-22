@@ -22,6 +22,9 @@ struct SimulationSetupView: View {
     
     @State private var isFetching: Bool = false
     @State private var showActualSimulation: Bool = false
+    @State private var isStartButtonPulsing = false
+    @State private var visibleHorseCount: Int = 0
+    @State private var revealTask: Task<Void, Never>? = nil
     
     let parser = JsonParser()
     private let apiFormatter: DateFormatter = {
@@ -35,30 +38,28 @@ struct SimulationSetupView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 20) {
+                
                 headerSection
                 
                 if isFetching {
-                    Spacer()
                     ProgressView().tint(.cyan).scaleEffect(1.5)
+                        .padding(.vertical, 20)
                     Text("Program Yükleniyor...").foregroundColor(.gray).font(.caption)
-                    Spacer()
                 } else if kosular.isEmpty {
-                    Spacer()
                     Text("Bu şehre ait yarış programı bulunamadı.")
                         .foregroundColor(.gray)
-                    Spacer()
+                        .padding(.vertical, 40)
                 } else {
                     cityPickerSection
                     racePickerSection
                     horsesPreviewSection
-                    
-                    Spacer()
                     startSimulationButton
+                        .padding(.top, 10)
                 }
+                
+                Spacer()
             }
-            .padding(.top)
         }
-        .navigationTitle("Simülasyon Ayarları")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if let city = initialCity ?? availableCities.first {
@@ -82,19 +83,22 @@ struct SimulationSetupView: View {
 extension SimulationSetupView {
     
     private var headerSection: some View {
-        VStack(spacing: 5) {
-            Image(systemName: "sparkles.tv.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.cyan)
-            Text("YAPAY ZEKA SİMÜLATÖRÜ")
-                .font(.headline.bold())
-                .foregroundColor(.white)
+            VStack(spacing: 5) {
+                Image("tayzekatransparent")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 120)
+                //Text("TAY ZEKA SİMÜLASYONU")
+                //    .font(.subheadline.bold())
+                //    .foregroundColor(Color.cyan.opacity(0.8))
+            }
+            //.padding(.bottom, 5)
         }
-    }
     
     private var cityPickerSection: some View {
-        VStack(alignment: .leading) {
-            Text("ŞEHİR SEÇİMİ").font(.caption.bold()).foregroundColor(.gray).padding(.horizontal)
+        //VStack(alignment: .leading) {
+        VStack (spacing: 10){
+            //Text("ŞEHİR SEÇİMİ").font(.caption.bold()).foregroundColor(.gray).padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(availableCities, id: \.self) { city in
@@ -115,13 +119,14 @@ extension SimulationSetupView {
                     }
                 }
                 .padding(.horizontal)
+                .frame(minWidth: UIScreen.main.bounds.width)
             }
         }
     }
     
     private var racePickerSection: some View {
-        VStack(alignment: .leading) {
-            Text("KOŞU SEÇİMİ").font(.caption.bold()).foregroundColor(.gray).padding(.horizontal)
+        VStack(spacing: 10) {
+            //Text("KOŞU SEÇİMİ").font(.caption.bold()).foregroundColor(.gray).padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(kosular.indices, id: \.self) { index in
@@ -132,10 +137,10 @@ extension SimulationSetupView {
                             VStack(spacing: 4) {
                                 Text("\(kosuNo). Koşu")
                                     .font(.system(size: 14, weight: .bold))
-                                Text(kosular[index].MESAFE ?? "")
+                                Text("\(kosular[index].MESAFE ?? "")m \(kosular[index].PISTADI_TR ?? "")")
                                     .font(.system(size: 10))
                             }
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(selectedKosuIndex == index ? Color.orange : Color.white.opacity(0.1))
                             .foregroundColor(selectedKosuIndex == index ? .black : .white)
@@ -144,57 +149,65 @@ extension SimulationSetupView {
                     }
                 }
                 .padding(.horizontal)
+                .frame(minWidth: UIScreen.main.bounds.width)
             }
         }
     }
     
     private var horsesPreviewSection: some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text("KATILACAK SAFKANLAR").font(.caption.bold()).foregroundColor(.gray)
-                Spacer()
-                if kosular.indices.contains(selectedKosuIndex) {
-                    Text("\(kosular[selectedKosuIndex].atlar?.count ?? 0) At")
-                        .font(.caption2.bold())
-                        .foregroundColor(.cyan)
-                }
-            }
-            .padding(.horizontal)
-            
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    if kosular.indices.contains(selectedKosuIndex), let atlar = kosular[selectedKosuIndex].atlar {
-                        ForEach(atlar) { at in
-                            HStack(spacing: 8) {
-                                // Renkli At İkonu
-                                ZStack {
-                                    Circle().fill(at.horseColor).frame(width: 30, height: 30)
-                                    Text(at.NO ?? "0").font(.system(size: 12, weight: .black)).foregroundColor(.white)
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(at.AD ?? "-")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                    Text(at.JOKEYADI ?? "-")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.gray)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                            }
-                            .padding(8)
-                            .background(Color.white.opacity(0.05))
-                            .cornerRadius(8)
-                        }
+            VStack(spacing: 10) {
+                HStack {
+                    Text("KATILACAK SAFKANLAR").font(.caption.bold()).foregroundColor(.gray)
+                    Spacer()
+                    if kosular.indices.contains(selectedKosuIndex) {
+                        Text("\(kosular[selectedKosuIndex].atlar?.count ?? 0) At")
+                            .font(.caption2.bold())
+                            .foregroundColor(.cyan)
                     }
                 }
                 .padding(.horizontal)
+                
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // En başa dönmek için görünmez bir işaretçi (Marker)
+                            Color.clear.frame(height: 1).id("TopMarker")
+                            
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                if kosular.indices.contains(selectedKosuIndex), let atlar = kosular[selectedKosuIndex].atlar {
+                                    ForEach(Array(atlar.enumerated()), id: \.element.id) { index, at in
+                                        // Koşular karışmasın diye her ata "koşu_index" şeklinde eşsiz kimlik veriyoruz
+                                        let uniqueID = "horse_\(selectedKosuIndex)_\(index)"
+                                        
+                                        AnimatedHorseCard(at: at, isVisible: index < visibleHorseCount)
+                                            .id(uniqueID)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 5) // Top marker ile araya çok hafif boşluk
+                        }
+                    }
+                    .onChange(of: visibleHorseCount) { _, newCount in
+                        if newCount > 0 {
+                            withAnimation {
+                                // Sadece sıradaki ata doğru kaydır
+                                let targetID = "horse_\(selectedKosuIndex)_\(newCount - 1)"
+                                proxy.scrollTo(targetID, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: selectedKosuIndex) { _, _ in
+                        withAnimation {
+                            // Başka koşu seçilince en tepeye kaydır
+                            proxy.scrollTo("TopMarker", anchor: .top)
+                        }
+                        startRevealTask()
+                    }
+                }
             }
+            .frame(maxHeight: 600)
         }
-        .frame(maxHeight: 300) // Ekranı çok kaplamaması için sınır
-    }
     
     private var startSimulationButton: some View {
         Button {
@@ -202,18 +215,29 @@ extension SimulationSetupView {
         } label: {
             HStack {
                 Image(systemName: "play.fill")
-                Text("SİMÜLASYONU BAŞLAT")
+                Text("BAŞLAT")
                     .font(.headline.bold())
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.cyan)
-            .foregroundColor(.black)
+            .background(.ultraThinMaterial)
+            .foregroundColor(Color.cyan.opacity(0.8))
             .cornerRadius(15)
             .padding(.horizontal)
-            .shadow(color: .cyan.opacity(0.4), radius: 10)
+            .shadow(color: .cyan.opacity(isStartButtonPulsing ? 0.8 : 0.6), radius: isStartButtonPulsing ? 15 : 5)
+            .scaleEffect(isStartButtonPulsing ? 1.05 : 1.0)
         }
-        .padding(.bottom, 20)
+        .padding(.bottom, 50)
+        .animation(
+                .easeInOut(duration: 1.0).repeatForever(autoreverses: true),
+                value: isStartButtonPulsing
+        )
+        .onAppear {
+            isStartButtonPulsing = true
+        }
+        .onDisappear {
+            isStartButtonPulsing = false
+        }
     }
     
     // MARK: - DATA FETCHING
@@ -241,6 +265,7 @@ extension SimulationSetupView {
                     self.havaData = newHava
                     self.kosular = newKosular
                     self.isFetching = false
+                    self.startRevealTask()
                 }
             } catch {
                 await MainActor.run {
@@ -250,4 +275,132 @@ extension SimulationSetupView {
             }
         }
     }
+    
+    private func startRevealTask() {
+            revealTask?.cancel() // Eski sayacı kesinlikle durdur
+            visibleHorseCount = 0 // Ekrani temizle
+            
+            guard kosular.indices.contains(selectedKosuIndex),
+                  let atlar = kosular[selectedKosuIndex].atlar,
+                  !atlar.isEmpty else { return }
+            
+            let totalHorses = atlar.count
+            
+            revealTask = Task {
+                // UI'ın eski listeyi temizlediğinden emin olmak için çok minik bir es (0.05 saniye)
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                if Task.isCancelled { return }
+                
+                for i in 0..<totalHorses {
+                    // 1. ÖNCE ATI GÖSTER (İlk at hiç beklemeden anında görünür)
+                    await MainActor.run {
+                        if !Task.isCancelled {
+                            visibleHorseCount = i + 1
+                        }
+                    }
+                    
+                    // 2. SONRA DİĞER AT İÇİN BEKLE (0.5 saniye)
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    
+                    // Eğer bu bekleme sırasında kullanıcı başka koşuya tıkladıysa döngüyü anında kır
+                    if Task.isCancelled { break }
+                }
+            }
+        }
+    
+}
+
+
+struct AnimatedHorseCard: View {
+    let at: Horse
+    let isVisible: Bool // Görünürlüğü artık parent yönetiyor
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle().fill(at.horseColor).frame(width: 30, height: 30)
+                Text(at.NO ?? "0").font(.system(size: 12, weight: .black)).foregroundColor(.white)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(at.AD ?? "-")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Text(at.JOKEYADI ?? "-")
+                    .font(.system(size: 10))
+                    .foregroundColor(.gray)
+                    .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(6)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(8)
+        .opacity(isVisible ? 1 : 0) // isVisible true olunca opaklaşır
+        .offset(y: isVisible ? 0 : 30) // isVisible true olunca kendi konumuna kayar
+        // Animasyon delay olmadan, isVisible tetiklendiği an çalışır
+        .animation(.easeOut(duration: 0.8), value: isVisible)
+    }
+}
+
+// MARK: - PREVIEW
+#Preview {
+    // 1. Mock Atlar
+    let h1 = Horse(
+        KOD: "1001",
+        NO: "1",
+        AD: "GÜLŞAH SULTAN",
+        START: "1", 
+        JOKEYADI: "H. KARATAŞ"
+    )
+    
+    let h2 = Horse(
+        KOD: "1002",
+        NO: "2",
+        AD: "RÜZGAR GİBİ",
+        START: "2",
+        JOKEYADI: "S. KAYA"
+    )
+    
+    let h3 = Horse(
+        KOD: "1003",
+        NO: "3",
+        AD: "ŞAMPİYON TAY",
+        START: "3",
+        JOKEYADI: "A. KURŞUN"
+    )
+
+    // 2. Mock Koşular (Farklı koşular oluşturuyoruz ki racePickerSection çalışsın)
+    let mockRace1 = Race(
+        KOD: "901",
+        RACENO: "1",
+        SAAT: "14:00",
+        BILGI_TR: "3 Yaşlı İngilizler",
+        MESAFE: "1400",
+        atlar: [h1, h2, h3]
+    )
+    
+    let mockRace2 = Race(
+        KOD: "902",
+        RACENO: "2",
+        SAAT: "14:30",
+        BILGI_TR: "4 Yaşlı Araplar",
+        MESAFE: "1600",
+        atlar: [h1, h2] // 2. koşuda sadece 2 at var
+    )
+    
+    // 3. Mevcut tarihi ayarla
+    let today = Date()
+
+    // 4. View'ı Döndür
+    NavigationStack {
+        SimulationSetupView(
+            selectedDate: today,
+            availableCities: ["BURSA", "SANLIURFA"],
+            initialCity: "BURSA"
+            
+        )
+    }
+    .preferredColorScheme(.dark)
 }
