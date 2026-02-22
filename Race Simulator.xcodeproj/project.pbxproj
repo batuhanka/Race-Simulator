@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		DF7E9E732F4B3F5C001B4724 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = DF7E9E722F4B3F4C001B4724 /* Secrets.xcconfig */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		DFD4B7412D8361F200050A45 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,7 +25,6 @@
 
 /* Begin PBXFileReference section */
 		DF498A812D90A2AB000AEB60 /* Race Simulator.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Race Simulator.xctestplan"; sourceTree = "<group>"; };
-		DF7E9E722F4B3F4C001B4724 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		DFD4B7302D8361F100050A45 /* Race Simulator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Race Simulator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFD4B7402D8361F200050A45 /* Race SimulatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Race SimulatorTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		DFD4B74A2D8361F200050A45 /* Race SimulatorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Race SimulatorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -81,7 +76,6 @@
 		DFD4B7272D8361F100050A45 = {
 			isa = PBXGroup;
 			children = (
-				DF7E9E722F4B3F4C001B4724 /* Secrets.xcconfig */,
 				DF498A812D90A2AB000AEB60 /* Race Simulator.xctestplan */,
 				DFD4B7322D8361F100050A45 /* Race Simulator */,
 				DFD4B7432D8361F200050A45 /* Race SimulatorTests */,
@@ -220,7 +214,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DF7E9E732F4B3F5C001B4724 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,7 +273,6 @@
 /* Begin XCBuildConfiguration section */
 		DFD4B7522D8361F200050A45 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DF7E9E722F4B3F4C001B4724 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -345,7 +337,6 @@
 		};
 		DFD4B7532D8361F200050A45 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DF7E9E722F4B3F4C001B4724 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

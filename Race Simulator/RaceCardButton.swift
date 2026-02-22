@@ -41,7 +41,6 @@ struct RaceCardButton: View {
             name = name.replacingOccurrences(of: target, with: replacement)
         }
         
-        // "istanbul" -> "istanbulhipodrom"
         return name + "hipodrom"
     }
     

@@ -178,11 +178,10 @@ struct RootView: View {
             
             showExplosion = true
             
-            // Patlama biterken görünümü tamamen hiyerarşiden çıkarıyoruz
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 withAnimation(.easeInOut(duration: 0.8)) {
                     isAppReady = true
-                    showExplosion = false // Bu satır merkezdeki kalıntıyı yok eder
+                    showExplosion = false 
                 }
             }
         }

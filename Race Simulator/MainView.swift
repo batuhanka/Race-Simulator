@@ -11,6 +11,7 @@ struct MainView: View {
     @State private var kosular: [Race] = []
     @State private var agf: [[String: Any]] = []
     @State private var isGlobalFetching: Bool = false
+    @State private var showSimulation: Bool = false
     
     // MARK: Binding
     @Binding var selectedBottomTab: Int
@@ -75,10 +76,13 @@ struct MainView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 25) {
                         dynamicRaceProgramSection
+                        simulationCardSection
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
                 }
+                
+                
                 
                 
             }
@@ -108,6 +112,10 @@ struct MainView: View {
                         selectedBottomTab: $selectedBottomTab
                     )
                 }
+            }
+            .navigationDestination(isPresented: $showSimulation) {
+                // Buraya simülasyon sayfanızın View'ını koyabilirsiniz.
+                Text("Simülasyon Sayfası")
             }
             .onAppear {
                 fetchRaces()
@@ -208,6 +216,64 @@ struct MainView: View {
         }
     }
     
+    // MARK: - SİMÜLASYON KARTI
+    private var simulationCardSection: some View {
+        Button(action: {
+            showSimulation = true
+        }) {
+            ZStack {
+                
+                Image("simulasyon")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 320, height: 100)
+                    .clipped()
+                
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0.85),
+                        Color.black.opacity(0.4),
+                        Color.clear
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                
+                // 3. İçerik
+                HStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SİMÜLASYON")
+                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .tracking(1)
+                        
+                        
+                    }
+                    
+                    Spacer()
+                    
+                    // Sağdaki ikon (RaceCardButton ile aynı stil)
+                    Image(systemName: "sparkles.tv.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundColor(.cyan)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 25)
+            }
+            // BOYUTLAR: RaceCardButton ile birebir aynı
+            .frame(height: 110)
+            .frame(maxWidth: .infinity)
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 6)
+        }
+        .buttonStyle(CardPressEffectStyle()) // Aynı basma efekti
+    }
+    
     // MARK: - LOGIC
     private func changeDate(by days: Int) {
         guard let newDate = Calendar.current.date(byAdding: .day, value: days, to: selectedDate) else { return }
@@ -239,6 +305,6 @@ struct MainView: View {
 
 #Preview("MainView") {
     MainView(selectedBottomTab: .constant(0))
-        .preferredColorScheme(.none)
+        .preferredColorScheme(.dark)
 }
 
