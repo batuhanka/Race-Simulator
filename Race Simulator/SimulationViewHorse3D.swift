@@ -23,6 +23,7 @@ struct SimulationViewHorse3D: View {
     
     let timer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()
     
+    // Pist sınırları
     let startX: Float = -22.0
     let finishX: Float = 22.0
     
@@ -43,13 +44,16 @@ struct SimulationViewHorse3D: View {
                 
                 Spacer()
                 
+                // YENİ: ZStack hizalaması "Sağ Alt" (.bottomTrailing) yapıldı
                 ZStack(alignment: .bottomTrailing) {
                     HStack {
                         leaderboardHUD
                         Spacer()
                     }
                     
+                    // START Butonu artık sağ alt köşede
                     controlPanel
+                        .padding(.trailing, 24)
                 }
                 .padding(.bottom, 20)
             }
@@ -88,6 +92,7 @@ extension SimulationViewHorse3D {
                     Text(kosu.BILGI_TR ?? "3D Simülasyon")
                         .font(.system(size: 10, weight: .medium)).foregroundColor(Color.white.opacity(0.6))
                 }
+                
             }
             Spacer()
             HStack(spacing: 20) {
@@ -112,7 +117,6 @@ extension SimulationViewHorse3D {
                 resetSimulation()
             } else {
                 isSimulating.toggle()
-                // Duraklatılınca veya Başlatılınca bacakları dondur/çalıştır
                 for node in horseNodes.values {
                     node.isPaused = !isSimulating
                 }
@@ -120,10 +124,11 @@ extension SimulationViewHorse3D {
         }) {
             HStack(spacing: 12) {
                 Image(systemName: finishLineReached ? "arrow.counterclockwise" : (isSimulating ? "pause.fill" : "play.fill"))
-                Text(finishLineReached ? "TEKRARLA" : (isSimulating ? "DURAKLAT" : "START VER"))
+                Text(finishLineReached ? "TEKRAR" : (isSimulating ? "DURAKLAT" : "START VER"))
             }
             .font(.system(size: 14, weight: .black)).foregroundColor(Color.black)
-            .frame(width: 250, height: 44).background(finishLineReached ? Color.white : Color.cyan)
+            .frame(width: 180, height: 44) // Genişlik biraz daraltıldı köşeye uyması için
+            .background(finishLineReached ? Color.white : Color.cyan)
             .clipShape(Capsule())
             .shadow(color: Color.black.opacity(0.6), radius: 6, x: 0, y: 4)
         }
@@ -221,6 +226,34 @@ extension SimulationViewHorse3D {
         }
     }
     
+    // YENİ: Mesafe Tabela Dokusu (Kırmızı Zemin, Beyaz Yazı)
+    private func createDistanceMarkerTexture(text: String) -> UIImage {
+        let size = CGSize(width: 200, height: 100)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            // Kırmızı Zemin
+            UIColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1.0).setFill()
+            UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 10).fill()
+            
+            // Beyaz Dış Çerçeve
+            UIColor.white.setStroke()
+            let border = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 4, dy: 4), cornerRadius: 8)
+            border.lineWidth = 4
+            border.stroke()
+            
+            // Metin (Örn: "400")
+            let textAttr: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 45, weight: .black),
+                .foregroundColor: UIColor.white
+            ]
+            let str = NSAttributedString(string: text, attributes: textAttr)
+            let strSize = str.size()
+            str.draw(in: CGRect(x: (size.width - strSize.width) / 2,
+                                y: (size.height - strSize.height) / 2,
+                                width: strSize.width, height: strSize.height))
+        }
+    }
+    
     private func setup3DScene() {
         let newScene = SCNScene()
         newScene.background.contents = UIColor(red: 0.05, green: 0.05, blue: 0.1, alpha: 1.0)
@@ -280,6 +313,36 @@ extension SimulationViewHorse3D {
         let finishNode = SCNNode(geometry: finishGeo); finishNode.position = SCNVector3(finishX, 0, 0)
         newScene.rootNode.addChildNode(finishNode)
         
+        // YENİ: MESAFE TABELALARI SİSTEMİ
+        let realDistance = Float(kosu.MESAFE ?? "1200") ?? 1200.0
+        let distanceSpan = finishX - startX // 3D dünyadaki pist uzunluğu (44 birim)
+        
+        // Bitişe kalan mesafeleri bulur (200, 400, 600... şeklinde gerçek mesafeden küçük olanlar)
+        let markerDistances = stride(from: 200, to: Int(realDistance), by: 200)
+        
+        for dist in markerDistances {
+            // Yarışın ne kadarı kalmış? (Örn: 1900m yarışta 400m tabelası için oran = 400 / 1900)
+            let ratio = Float(dist) / realDistance
+            
+            // X ekseninde tabelanın konumunu, bitiş çizgisinden geriye giderek hesaplarız
+            let markerX = finishX - (ratio * distanceSpan)
+            
+            // Tabela Ekranı
+            let boardGeo = SCNPlane(width: 1.8, height: 0.9)
+            boardGeo.firstMaterial?.diffuse.contents = createDistanceMarkerTexture(text: "\(dist)")
+            let boardNode = SCNNode(geometry: boardGeo)
+            boardNode.position = SCNVector3(markerX, 1.0, startZ - 1.4) // Arka bariyerin hemen üstü/önü
+            
+            // Tabelanın direği
+            let poleGeo = SCNCylinder(radius: 0.05, height: 1.0)
+            poleGeo.firstMaterial?.diffuse.contents = UIColor.white
+            let poleNode = SCNNode(geometry: poleGeo)
+            poleNode.position = SCNVector3(markerX, 0.3, startZ - 1.4)
+            
+            newScene.rootNode.addChildNode(poleNode)
+            newScene.rootNode.addChildNode(boardNode)
+        }
+        
         horseBaseSpeeds.removeAll()
         for (index, at) in atlar.enumerated() {
             let container = SCNNode()
@@ -300,7 +363,6 @@ extension SimulationViewHorse3D {
         }
         self.scene = newScene
         
-        // YENİ: Sahne yüklendikten saliseler sonra bacakları KESİN olarak dondur!
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             for node in self.horseNodes.values {
                 node.isPaused = true
@@ -347,7 +409,6 @@ extension SimulationViewHorse3D {
     }
     
     private func updateRaceLogic() {
-        // YENİ: Saniyede 60 kere isPaused ataması YAPTIRMIYORUZ! Sadece return ile çıkıyoruz.
         guard isSimulating && !finishLineReached else { return }
         
         guard let atlar = kosu.atlar else { return }
@@ -372,7 +433,6 @@ extension SimulationViewHorse3D {
                 finishLineReached = true
                 withAnimation { winnerHorse = at }
                 
-                // Photo Finish Anı! Çizgiyi geçer geçmez dondur!
                 for n in horseNodes.values {
                     n.isPaused = true
                 }
@@ -444,6 +504,6 @@ extension SimulationViewHorse3D {
 // MARK: - PREVIEW
 #Preview {
     let mockAtlar = (1...6).map { i in Horse(KOD: "\(i)", NO: "\(i)", AD: "AT \(i)", START: "\(i)", JOKEYADI: "JOKEY \(i)", AGF1: "5,00") }
-    let mockRace = Race(KOD: "1", RACENO: "6", SAAT: "20:00", BILGI_TR: "SANLIURFA - 6. KOSU", MESAFE: "1200", atlar: mockAtlar)
+    let mockRace = Race(KOD: "1", RACENO: "6", SAAT: "20:00", BILGI_TR: "SANLIURFA - 6. KOSU", MESAFE: "1900", atlar: mockAtlar) // Örnek olarak 1900m yapıldı
     return SimulationViewHorse3D(raceCity: "SANLIURFA", havaData: HavaData.default, kosu: mockRace).preferredColorScheme(.dark)
 }
