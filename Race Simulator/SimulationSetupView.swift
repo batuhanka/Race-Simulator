@@ -5,7 +5,6 @@
 //  Created by Batuhan KANDIRAN on 23.02.2026.
 //
 
-
 import SwiftUI
 
 struct SimulationSetupView: View {
@@ -67,7 +66,6 @@ struct SimulationSetupView: View {
                 fetchProgram(for: city)
             }
         }
-        
         .fullScreenCover(isPresented: $showActualSimulation) {
             if kosular.indices.contains(selectedKosuIndex) {
                 SimulationViewHorse3D(
@@ -75,23 +73,8 @@ struct SimulationSetupView: View {
                     havaData: havaData,
                     kosu: kosular[selectedKosuIndex]
                 )
-                /*
-                 SimulationView3D(
-                 raceCity: selectedCity,
-                 havaData: havaData,
-                 kosu: kosular[selectedKosuIndex]
-                 )
-                 */
-                /*
-                 SimulationView(
-                 raceCity: selectedCity,
-                 havaData: havaData,
-                 kosu: kosular[selectedKosuIndex]
-                 )
-                 */
             }
         }
-        
     }
 }
 
@@ -104,16 +87,11 @@ extension SimulationSetupView {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 120)
-            //Text("TAY ZEKA SİMÜLASYONU")
-            //    .font(.subheadline.bold())
-            //    .foregroundColor(Color.cyan.opacity(0.8))
         }
-        //.padding(.bottom, 5)
     }
     
     private var cityPickerSection: some View {
         VStack(spacing: 10) {
-            // Ekranın anlık genişliğini okumak için GeometryReader kullanıyoruz
             GeometryReader { geometry in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -135,11 +113,10 @@ extension SimulationSetupView {
                         }
                     }
                     .padding(.horizontal)
-                    // Öğeler azsa tam ortaya hizalar, çoksa kaydırmaya izin verir
                     .frame(minWidth: geometry.size.width)
                 }
             }
-            .frame(height: 40) // Butonların yüksekliğini GeometryReader'a bildiriyoruz
+            .frame(height: 40)
         }
     }
     
@@ -168,11 +145,10 @@ extension SimulationSetupView {
                         }
                     }
                     .padding(.horizontal)
-                    // Öğeler azsa tam ortaya hizalar, çoksa kaydırmaya izin verir
                     .frame(minWidth: geometry.size.width)
                 }
             }
-            .frame(height: 45) // Çift satırlı butonlar için yükseklik
+            .frame(height: 45)
         }
     }
     
@@ -192,13 +168,11 @@ extension SimulationSetupView {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        // En başa dönmek için görünmez bir işaretçi (Marker)
                         Color.clear.frame(height: 1).id("TopMarker")
                         
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             if kosular.indices.contains(selectedKosuIndex), let atlar = kosular[selectedKosuIndex].atlar {
                                 ForEach(Array(atlar.enumerated()), id: \.element.id) { index, at in
-                                    // Koşular karışmasın diye her ata "koşu_index" şeklinde eşsiz kimlik veriyoruz
                                     let uniqueID = "horse_\(selectedKosuIndex)_\(index)"
                                     
                                     AnimatedHorseCard(at: at, isVisible: index < visibleHorseCount)
@@ -207,13 +181,12 @@ extension SimulationSetupView {
                             }
                         }
                         .padding(.horizontal)
-                        .padding(.top, 5) // Top marker ile araya çok hafif boşluk
+                        .padding(.top, 5)
                     }
                 }
                 .onChange(of: visibleHorseCount) { _, newCount in
                     if newCount > 0 {
                         withAnimation {
-                            // Sadece sıradaki ata doğru kaydır
                             let targetID = "horse_\(selectedKosuIndex)_\(newCount - 1)"
                             proxy.scrollTo(targetID, anchor: .bottom)
                         }
@@ -221,7 +194,6 @@ extension SimulationSetupView {
                 }
                 .onChange(of: selectedKosuIndex) { _, _ in
                     withAnimation {
-                        // Başka koşu seçilince en tepeye kaydır
                         proxy.scrollTo("TopMarker", anchor: .top)
                     }
                     startRevealTask()
@@ -299,8 +271,8 @@ extension SimulationSetupView {
     }
     
     private func startRevealTask() {
-        revealTask?.cancel() // Eski sayacı kesinlikle durdur
-        visibleHorseCount = 0 // Ekrani temizle
+        revealTask?.cancel()
+        visibleHorseCount = 0
         
         guard kosular.indices.contains(selectedKosuIndex),
               let atlar = kosular[selectedKosuIndex].atlar,
@@ -309,72 +281,109 @@ extension SimulationSetupView {
         let totalHorses = atlar.count
         
         revealTask = Task {
-            // UI'ın eski listeyi temizlediğinden emin olmak için çok minik bir es (0.05 saniye)
             try? await Task.sleep(nanoseconds: 50_000_000)
             if Task.isCancelled { return }
             
             for i in 0..<totalHorses {
-                // 1. ÖNCE ATI GÖSTER (İlk at hiç beklemeden anında görünür)
                 await MainActor.run {
                     if !Task.isCancelled {
                         visibleHorseCount = i + 1
                     }
                 }
                 
-                // 2. SONRA DİĞER AT İÇİN BEKLE (0.5 saniye)
                 try? await Task.sleep(nanoseconds: 500_000_000)
-                
-                // Eğer bu bekleme sırasında kullanıcı başka koşuya tıkladıysa döngüyü anında kır
                 if Task.isCancelled { break }
             }
         }
     }
-    
 }
 
-
+// MARK: - YENİ: Premium TV/Oyun Tarzı Formalı At Kartı
 struct AnimatedHorseCard: View {
     let at: Horse
-    let isVisible: Bool // Görünürlüğü artık parent yönetiyor
+    let isVisible: Bool
     
     var body: some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle().fill(at.horseColor).frame(width: 30, height: 30)
-                Text(at.NO ?? "0").font(.system(size: 12, weight: .black)).foregroundColor(.white)
+        ZStack(alignment: .leading) {
+            // 1. ARKA PLAN: Forma Görseli (Tüm kartı kaplar)
+            if let formaLink = at.FORMA, let url = URL(string: formaLink) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure, .empty:
+                        Color(at.horseColor).opacity(0.5) // Yüklenemezse atın rengini koy
+                    @unknown default:
+                        Color.black
+                    }
+                }
+                .frame(height: 65)
+                .clipped() // Kart dışına taşmayı engeller
+            } else {
+                Color(at.horseColor).opacity(0.5)
+                    .frame(height: 65)
             }
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text(at.AD ?? "-")
-                    .font(.system(size: 12, weight: .bold))
+            // 2. GÖLGE KATMANI: Yazıların okunmasını sağlayan soldan sağa gradient
+            LinearGradient(
+                gradient: Gradient(colors: [Color.black.opacity(0.95), Color.black.opacity(0.7), Color.clear]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(height: 65)
+            
+            // 3. İÇERİK: Numara, At ve Jokey Adı
+            HStack(spacing: 8) {
+                // Numara çok daha agresif, italik ve büyük
+                Text(at.NO ?? "0")
+                    .font(.system(size: 28, weight: .heavy))
+                    .italic()
                     .foregroundColor(.white)
+                    // DÜZELTME BURADA: Genişliği 45 yaptık ve sığmazsa küçül komutu verdik
+                    .frame(width: 45, alignment: .center)
+                    .minimumScaleFactor(0.7)
                     .lineLimit(1)
-                Text(at.JOKEYADI ?? "-")
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
+                    .shadow(color: .black, radius: 2, x: 1, y: 1)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(at.AD ?? "-")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    Text(at.JOKEYADI ?? "-")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
+                Spacer()
             }
-            Spacer()
+            .padding(.horizontal, 10)
         }
-        .padding(6)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(8)
-        .opacity(isVisible ? 1 : 0) // isVisible true olunca opaklaşır
-        .offset(y: isVisible ? 0 : 30) // isVisible true olunca kendi konumuna kayar
-        // Animasyon delay olmadan, isVisible tetiklendiği an çalışır
+        .frame(height: 65)
+        .cornerRadius(12)
+        // Premium hissiyat için çok ince beyaz bir dış çerçeve
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
+        .opacity(isVisible ? 1 : 0)
+        .offset(y: isVisible ? 0 : 30)
         .animation(.easeOut(duration: 0.8), value: isVisible)
     }
 }
 
 // MARK: - PREVIEW
 #Preview {
-    // 1. Mock Atlar
+    // 1. Mock Atlar (Gerçek TJK forma linki ile)
     let h1 = Horse(
         KOD: "1001",
         NO: "1",
         AD: "GÜLŞAH SULTAN",
-        START: "1", 
-        JOKEYADI: "H. KARATAŞ"
+        START: "1",
+        JOKEYADI: "H. KARATAŞ",
+        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
     )
     
     let h2 = Horse(
@@ -382,7 +391,8 @@ struct AnimatedHorseCard: View {
         NO: "2",
         AD: "RÜZGAR GİBİ",
         START: "2",
-        JOKEYADI: "S. KAYA"
+        JOKEYADI: "S. KAYA",
+        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
     )
     
     let h3 = Horse(
@@ -390,10 +400,11 @@ struct AnimatedHorseCard: View {
         NO: "3",
         AD: "ŞAMPİYON TAY",
         START: "3",
-        JOKEYADI: "A. KURŞUN"
+        JOKEYADI: "A. KURŞUN",
+        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
     )
     
-    // 2. Mock Koşular (Farklı koşular oluşturuyoruz ki racePickerSection çalışsın)
+    // 2. Mock Koşular
     let mockRace1 = Race(
         KOD: "901",
         RACENO: "1",
@@ -409,19 +420,16 @@ struct AnimatedHorseCard: View {
         SAAT: "14:30",
         BILGI_TR: "4 Yaşlı Araplar",
         MESAFE: "1600",
-        atlar: [h1, h2] // 2. koşuda sadece 2 at var
+        atlar: [h1, h2]
     )
     
-    // 3. Mevcut tarihi ayarla
     let today = Date()
     
-    // 4. View'ı Döndür
     NavigationStack {
         SimulationSetupView(
             selectedDate: today,
-            availableCities: ["BURSA", "SANLIURFA"],
-            initialCity: "BURSA"
-            
+            availableCities: ["ADANA", "ANTALYA"],
+            initialCity: "ADANA"
         )
     }
     .preferredColorScheme(.dark)

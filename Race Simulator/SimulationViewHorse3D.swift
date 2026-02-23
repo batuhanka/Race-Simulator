@@ -139,61 +139,111 @@ extension SimulationViewHorse3D {
         }
     }
     
-    private var leaderboardHUD: some View {
+    // YENİ: Taşkınlık korumalı (ScrollView) ve Daha Zarif Dinamik Boşluklu HUD
+        private var leaderboardHUD: some View {
             let topHorses = hasRaceStarted ? Array(currentRanking.prefix(5)) : currentRanking
             let displayedCount = topHorses.count
             
-            // Kalabalık yarışlar için satır arası boşluğunu (spacing) tamamen "0"a kadar düşürdük
-            let vSpacing: CGFloat = displayedCount > 15 ? 0 : (displayedCount > 10 ? 2 : 4)
+            // Boşlukları daha da daralttık
+            let vSpacing: CGFloat = displayedCount > 12 ? 1 : (displayedCount > 5 ? 2 : 4)
             
-            return VStack(alignment: .leading, spacing: vSpacing) {
-                //Text(hasRaceStarted ? "CANLI SIRALAMA" : "START LİSTESİ")
-                //    .font(.system(size: 10, weight: .black))
-                //    .foregroundColor(Color.white.opacity(0.7))
-                //    .padding(.bottom, 2)
-                
-                ForEach(Array(topHorses.enumerated()), id: \.element.id) { index, horse in
-                    leaderboardRow(index: index, horse: horse, displayedCount: displayedCount)
+            return ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: vSpacing) {
+                    //Text(hasRaceStarted ? "CANLI SIRALAMA" : "START LİSTESİ")
+                    //    .font(.system(size: 9, weight: .black)) // Başlık 10'dan 9'a düşürüldü
+                    //    .foregroundColor(Color.white.opacity(0.7))
+                    //    .padding(.bottom, 2)
+                    
+                    ForEach(Array(topHorses.enumerated()), id: \.element.id) { index, horse in
+                        leaderboardRow(index: index, horse: horse, displayedCount: displayedCount)
+                    }
+                    
                 }
+                .padding(.leading, 16)
             }
-            .padding(.leading, 16)
+            .frame(maxHeight: 260)
         }
         
+        // YENİ: Küçültülmüş EA FC Tarzı Formalı Satır
         private func leaderboardRow(index: Int, horse: Horse, displayedCount: Int) -> some View {
-            // 20 atlık kalabalık listeler için her şeyi mikroskobik ama okunaklı hale getirdik
-            let fontSize: CGFloat = displayedCount > 15 ? 8 : (displayedCount > 10 ? 10 : 12)
-            let circleSize: CGFloat = displayedCount > 15 ? 12 : (displayedCount > 10 ? 14 : 16)
-            let numberSize: CGFloat = displayedCount > 15 ? 7 : (displayedCount > 10 ? 8 : 9)
-            let vPadding: CGFloat = displayedCount > 15 ? 1 : (displayedCount > 10 ? 2 : 4)
+            let isUltraCompact = displayedCount > 12
+            let isCompact = displayedCount > 5 && displayedCount <= 12
             
-            return HStack(spacing: 8) {
-                // 1. Sıralama Numarası
-                Text("\(index + 1)")
-                    .font(.system(size: fontSize, weight: .bold))
-                    .foregroundColor(Color.cyan)
-                    .frame(width: 16, alignment: .leading)
+            // YAZI VE KUTU BOYUTLARI ÇOK DAHA KİBAR HALE GETİRİLDİ
+            let rowHeight: CGFloat = isUltraCompact ? 22 : (isCompact ? 30 : 40)
+            let rankSize: CGFloat = isUltraCompact ? 8 : (isCompact ? 9 : 11)
+            let noSize: CGFloat = isUltraCompact ? 14 : (isCompact ? 18 : 22)
+            let nameSize: CGFloat = isUltraCompact ? 9 : (isCompact ? 10 : 12)
+            let jockeySize: CGFloat = isUltraCompact ? 0 : (isCompact ? 8 : 9)
+            let cardWidth: CGFloat = 180 // Genişlik 200'den 180'e çekilerek piste yer açıldı
+            
+            return ZStack(alignment: .leading) {
+                // 1. ARKA PLAN: Forma Görseli (Tüm satırı kaplar)
+                if let formaLink = horse.FORMA, let url = URL(string: formaLink) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            Color(horse.horseColor).opacity(0.5)
+                        }
+                    }
+                    .frame(width: cardWidth, height: rowHeight)
+                    .clipped()
+                } else {
+                    Color(horse.horseColor).opacity(0.5).frame(width: cardWidth, height: rowHeight)
+                }
                 
-                // 2. Yarış Numarası (Beyaz daire içinde)
-                Text(horse.NO ?? "0")
-                    .font(.system(size: numberSize, weight: .black))
-                    .foregroundColor(.black)
-                    .frame(width: circleSize, height: circleSize)
-                    .background(Color.white)
-                    .clipShape(Circle())
+                // 2. GÖLGE KATMANI: Siyah Gradient (Okunabilirliği artırır)
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.black.opacity(0.95), Color.black.opacity(0.7), Color.clear]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: cardWidth, height: rowHeight)
                 
-                // 3. Jokey Forması (Yarış numarası ile BİREBİR AYNI boyutta)
-                jerseyImageView(url: horse.FORMA, size: circleSize)
-                
-                // 4. Atın Adı
-                Text(horse.AD ?? "At")
-                    .font(.system(size: fontSize, weight: .bold))
-                    .foregroundColor(Color.white)
-                    .lineLimit(1)
+                // 3. İÇERİK
+                HStack(spacing: 6) { // Elemanlar arası boşluk 8'den 6'ya düşürüldü
+                    // Sıra Numarası (Cyan)
+                    Text("\(index + 1)")
+                        .font(.system(size: rankSize, weight: .bold))
+                        .foregroundColor(Color.cyan)
+                        .frame(width: 14, alignment: .leading)
+                    
+                    // Yarış Numarası (Büyük İtalik EA Style)
+                    Text(horse.NO ?? "0")
+                        .font(.system(size: noSize, weight: .heavy))
+                        .italic()
+                        .foregroundColor(.white)
+                        .frame(width: isUltraCompact ? 20 : 26, alignment: .center)
+                        .minimumScaleFactor(0.5) // Sığmazsa küçül
+                        .lineLimit(1)
+                        .shadow(color: .black, radius: 1, x: 1, y: 1)
+                    
+                    // İsimler
+                    VStack(alignment: .leading, spacing: 0) { // VStack boşluğu sıfırlandı
+                        Text(horse.AD ?? "-")
+                            .font(.system(size: nameSize, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        if !isUltraCompact { // Çok kalabalık modda yer açmak için jokey ismini gizliyoruz
+                            Text(horse.JOKEYADI ?? "-")
+                                .font(.system(size: jockeySize, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 6)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, vPadding)
-            .background(Color.black.opacity(0.5))
-            .cornerRadius(6)
+            .frame(width: cardWidth, height: rowHeight)
+            .cornerRadius(isUltraCompact ? 4 : 8)
+            .overlay(
+                RoundedRectangle(cornerRadius: isUltraCompact ? 4 : 8)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+            // Sıralama değiştiğinde yukarı aşağı kayma animasyonu
             .animation(.easeInOut(duration: 0.3), value: currentRanking.map { $0.id })
         }
     
@@ -211,7 +261,6 @@ extension SimulationViewHorse3D {
                         .background(Color.white)
                         .clipShape(Circle())
                     
-                    // Kazanan forması devasa boyutta
                     jerseyImageView(url: horse.FORMA, size: 80)
                 }
                 
@@ -227,7 +276,7 @@ extension SimulationViewHorse3D {
         }
     }
     
-    // YENİ: Senin kodunla birebir uyumlu, tekrar kullanılabilir Forma Görseli Modülü
+    // Winner ekranı için eski yuvarlak ikon fonksiyonunu burada tuttuk
     @ViewBuilder
     private func jerseyImageView(url: String?, size: CGFloat) -> some View {
         AsyncImage(url: URL(string: url ?? "")) { phase in
@@ -249,13 +298,6 @@ extension SimulationViewHorse3D {
                 EmptyView()
             }
         }
-    }
-    
-    private func isLightColor(_ color: Color) -> Bool {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
-        let luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        return luminance > 0.6
     }
 }
 
@@ -542,7 +584,7 @@ extension SimulationViewHorse3D {
 
 // MARK: - PREVIEW
 #Preview {
-    let mockAtlar = (1...22).map { i in
+    let mockAtlar = (1...20).map { i in
         Horse(
             KOD: "\(i)",
             NO: "\(i)",
