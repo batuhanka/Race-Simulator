@@ -12,62 +12,62 @@ struct SimulationViewHorse3D: View {
     @State private var finishLineReached: Bool = false
     @State private var winnerHorse: Horse? = nil
     
-    // Canlı sıralamayı tutacak dizi
     @State private var currentRanking: [Horse] = []
+    @State private var lastLeaderboardUpdate: TimeInterval = 0
+    @State private var horseBaseSpeeds: [String: Float] = [:]
     
     // 3D Refs
     @State private var scene = SCNScene()
     @State private var horseNodes: [String: SCNNode] = [:]
-    @State private var horseProgress: [String: Float] = [:]
     @State private var cameraNode = SCNNode()
     
     let timer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()
     
-    // Pist sınırları
     let startX: Float = -22.0
     let finishX: Float = 22.0
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // 1. EN ALT KATMAN: Tam Ekran 3D Sahne
+            SceneView(
+                scene: scene,
+                pointOfView: cameraNode,
+                options: [.allowsCameraControl],
+                preferredFramesPerSecond: 60
+            )
+            .ignoresSafeArea()
             
+            // 2. ÜST KATMAN: Arayüz (UI) Elemanları
             VStack(spacing: 0) {
                 simulationHeader
                 
-                // MARK: - 3D SAHNE
-                SceneView(
-                    scene: scene,
-                    pointOfView: cameraNode,
-                    options: [.allowsCameraControl],
-                    preferredFramesPerSecond: 60
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
-                .padding(.top, -50)
-                
-                controlPanel
-            }
-            
-            // CANLI SIRALAMA EKRANI (Sol Alt Köşe)
-            VStack {
                 Spacer()
-                HStack {
-                    leaderboardHUD
-                    Spacer()
+                
+                ZStack(alignment: .bottomTrailing) {
+                    HStack {
+                        leaderboardHUD
+                        Spacer()
+                    }
+                    
+                    controlPanel
                 }
+                .padding(.bottom, 20)
             }
-            .padding(.bottom, 80) // Kontrol panelinin üstünde durması için
             
+            // 3. FİNİŞ KATMANI
             if let winner = winnerHorse {
                 winnerOverlay(horse: winner)
             }
         }
         .navigationBarHidden(true)
+        .onReceive(timer) { _ in
+            updateRaceLogic()
+        }
         .onAppear {
             forceLandscape()
             setup3DScene()
             if let atlar = kosu.atlar {
-                currentRanking = atlar // Başlangıçta listeyi doldur
+                currentRanking = atlar
             }
         }
         .onDisappear {
@@ -84,9 +84,9 @@ extension SimulationViewHorse3D {
                 RoundedRectangle(cornerRadius: 4).fill(Color.cyan).frame(width: 4, height: 24)
                 VStack(alignment: .leading, spacing: 0) {
                     Text("\(raceCity.uppercased(with: Locale(identifier: "tr_TR"))) LIVE")
-                        .font(.system(size: 14, weight: .black)).foregroundColor(.cyan)
+                        .font(.system(size: 14, weight: .black)).foregroundColor(Color.cyan)
                     Text(kosu.BILGI_TR ?? "3D Simülasyon")
-                        .font(.system(size: 10, weight: .medium)).foregroundColor(.white.opacity(0.6))
+                        .font(.system(size: 10, weight: .medium)).foregroundColor(Color.white.opacity(0.6))
                 }
             }
             Spacer()
@@ -94,10 +94,10 @@ extension SimulationViewHorse3D {
                 HStack(spacing: 6) { Image(systemName: "thermometer.medium"); Text("\(havaData.sicaklik)°C") }
                 Text(havaData.havaTr.uppercased())
             }
-            .font(.system(size: 12, weight: .bold)).foregroundColor(.cyan)
+            .font(.system(size: 12, weight: .bold)).foregroundColor(Color.cyan)
             Spacer()
             Button { safeDismiss() } label: {
-                Image(systemName: "xmark").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                Image(systemName: "xmark").font(.system(size: 14, weight: .bold)).foregroundColor(Color.white)
                     .padding(8).background(Circle().fill(Color.white.opacity(0.1)))
             }
         }
@@ -107,91 +107,100 @@ extension SimulationViewHorse3D {
     }
     
     private var controlPanel: some View {
-        ZStack {
-            Color.black.edgesIgnoringSafeArea(.bottom)
-            Button(action: { finishLineReached ? resetSimulation() : isSimulating.toggle() }) {
-                HStack(spacing: 12) {
-                    Image(systemName: finishLineReached ? "arrow.counterclockwise" : (isSimulating ? "pause.fill" : "play.fill"))
-                    Text(finishLineReached ? "TEKRARLA" : (isSimulating ? "DURAKLAT" : "START VER"))
+        Button(action: {
+            if finishLineReached {
+                resetSimulation()
+            } else {
+                isSimulating.toggle()
+                // Duraklatılınca veya Başlatılınca bacakları dondur/çalıştır
+                for node in horseNodes.values {
+                    node.isPaused = !isSimulating
                 }
-                .font(.system(size: 14, weight: .black)).foregroundColor(.black)
-                .frame(width: 250, height: 44).background(finishLineReached ? Color.white : Color.cyan)
-                .clipShape(Capsule())
             }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: finishLineReached ? "arrow.counterclockwise" : (isSimulating ? "pause.fill" : "play.fill"))
+                Text(finishLineReached ? "TEKRARLA" : (isSimulating ? "DURAKLAT" : "START VER"))
+            }
+            .font(.system(size: 14, weight: .black)).foregroundColor(Color.black)
+            .frame(width: 250, height: 44).background(finishLineReached ? Color.white : Color.cyan)
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.6), radius: 6, x: 0, y: 4)
         }
-        .frame(height: 70)
-        .onReceive(timer) { _ in updateRaceLogic() }
     }
     
-    // YENİ: Canlı Sıralama Arayüzü (İlk 5 Atı Gösterir)
     private var leaderboardHUD: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("CANLI SIRALAMA")
                 .font(.system(size: 10, weight: .black))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Color.white.opacity(0.7))
                 .padding(.bottom, 2)
             
-            ForEach(Array(currentRanking.prefix(5).enumerated()), id: \.element.id) { index, horse in
-                HStack(spacing: 8) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.cyan)
-                        .frame(width: 12, alignment: .leading)
-                    
-                    // Forma Rengi ve Numarası
-                    Circle()
-                        .fill(horse.horseColor)
-                        .frame(width: 16, height: 16)
-                        .overlay(
-                            Text(horse.NO ?? "0")
-                                .font(.system(size: 9, weight: .black))
-                                .foregroundColor(isLightColor(horse.horseColor) ? .black : .white)
-                        )
-                    
-                    Text(horse.AD ?? "At")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.black.opacity(0.5))
-                .cornerRadius(6)
+            let topHorses = Array(currentRanking.prefix(5))
+            
+            ForEach(Array(topHorses.enumerated()), id: \.element.id) { index, horse in
+                leaderboardRow(index: index, horse: horse)
             }
         }
         .padding(.leading, 16)
+    }
+    
+    private func leaderboardRow(index: Int, horse: Horse) -> some View {
+        HStack(spacing: 8) {
+            Text("\(index + 1)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color.cyan)
+                .frame(width: 12, alignment: .leading)
+            
+            Circle()
+                .fill(horse.horseColor)
+                .frame(width: 16, height: 16)
+                .overlay(
+                    Text(horse.NO ?? "0")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(isLightColor(horse.horseColor) ? Color.black : Color.white)
+                )
+            
+            Text(horse.AD ?? "At")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color.white)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.5))
+        .cornerRadius(6)
+        .animation(.easeInOut(duration: 0.3), value: currentRanking.map { $0.id })
     }
     
     private func winnerOverlay(horse: Horse) -> some View {
         ZStack {
             Color.black.opacity(0.9).ignoresSafeArea()
             VStack(spacing: 25) {
-                Text("PHOTO FINISH").font(.system(size: 14, weight: .black)).foregroundColor(.cyan).tracking(4)
+                Text("PHOTO FINISH").font(.system(size: 14, weight: .black)).foregroundColor(Color.cyan).tracking(4)
                 
-                // Kazanan ekranı için basit bir forma gösterimi (Büyük çıkartma yerine)
                 Circle()
                     .fill(horse.horseColor)
                     .frame(width: 120, height: 120)
                     .overlay(
                         Text(horse.NO ?? "0")
                             .font(.system(size: 60, weight: .black))
-                            .foregroundColor(isLightColor(horse.horseColor) ? .black : .white)
+                            .foregroundColor(isLightColor(horse.horseColor) ? Color.black : Color.white)
                     )
                     .overlay(Circle().stroke(Color.white, lineWidth: 4))
                 
                 VStack(spacing: 8) {
-                    Text(horse.AD ?? "-").font(.system(size: 32, weight: .black)).foregroundColor(.white)
-                    Text("JOKEY: \(horse.JOKEYADI ?? "-")").font(.system(size: 18, weight: .bold)).foregroundColor(.cyan)
+                    Text(horse.AD ?? "-").font(.system(size: 32, weight: .black)).foregroundColor(Color.white)
+                    Text("JOKEY: \(horse.JOKEYADI ?? "-")").font(.system(size: 18, weight: .bold)).foregroundColor(Color.cyan)
                 }
                 
                 Button("SIRALAMAYI GÖR") { safeDismiss() }
                     .font(.system(size: 14, weight: .black)).padding(.horizontal, 50).padding(.vertical, 14)
-                    .background(Color.white).foregroundColor(.black).cornerRadius(30)
+                    .background(Color.white).foregroundColor(Color.black).cornerRadius(30)
             }
         }
     }
     
-    // Yazı rengi kontrastı için yardımcı fonksiyon
     private func isLightColor(_ color: Color) -> Bool {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
@@ -214,8 +223,6 @@ extension SimulationViewHorse3D {
     
     private func setup3DScene() {
         let newScene = SCNScene()
-        
-        // Gökyüzü (Koyu gri/mavi tonları - Gece veya akşam üstü hissi için)
         newScene.background.contents = UIColor(red: 0.05, green: 0.05, blue: 0.1, alpha: 1.0)
         
         guard let atlar = kosu.atlar else { return }
@@ -226,7 +233,6 @@ extension SimulationViewHorse3D {
         let startZ = -totalZ / 2.0
         let trackLength = Float(totalZ + 10)
         
-        // Kamera
         cameraNode = SCNNode()
         cameraNode.camera = SCNCamera()
         cameraNode.camera?.fieldOfView = 50
@@ -234,7 +240,6 @@ extension SimulationViewHorse3D {
         cameraNode.eulerAngles = SCNVector3(x: -Float.pi/6, y: -Float.pi/10, z: 0)
         newScene.rootNode.addChildNode(cameraNode)
         
-        // Işıklar
         let ambient = SCNNode(); ambient.light = SCNLight(); ambient.light?.type = .ambient; ambient.light?.intensity = 150
         newScene.rootNode.addChildNode(ambient)
         
@@ -242,34 +247,30 @@ extension SimulationViewHorse3D {
         pointLight.position = SCNVector3(x: 0, y: 20, z: 10)
         newScene.rootNode.addChildNode(pointLight)
         
-        // YENİ: Çim Zemin (Grass) - Gökyüzünde koşmayı engeller
         let grassGeo = SCNPlane(width: 300, height: 300)
         grassGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.15, green: 0.35, blue: 0.15, alpha: 1.0)
         let grassNode = SCNNode(geometry: grassGeo)
         grassNode.eulerAngles = SCNVector3(-Float.pi/2, 0, 0)
-        grassNode.position = SCNVector3(0, -0.15, 0) // Pistin hemen altı
+        grassNode.position = SCNVector3(0, -0.15, 0)
         newScene.rootNode.addChildNode(grassNode)
         
-        // Pist
         let trackGeo = SCNPlane(width: 200, height: CGFloat(trackLength + 2.0))
-        trackGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.25, green: 0.18, blue: 0.12, alpha: 1.0) // Kum rengini biraz açtık
+        trackGeo.firstMaterial?.diffuse.contents = UIColor(red: 0.25, green: 0.18, blue: 0.12, alpha: 1.0)
         let trackNode = SCNNode(geometry: trackGeo); trackNode.eulerAngles = SCNVector3(-Float.pi/2, 0, 0); trackNode.position = SCNVector3(0, -0.1, 0)
         newScene.rootNode.addChildNode(trackNode)
         
-        // YENİ: Beyaz Bariyerler (Fences)
-        let barrierLength = CGFloat(200) // Pistin X eksenindeki tam boyu
+        let barrierLength = CGFloat(200)
         let barrierGeo = SCNBox(width: barrierLength, height: 0.6, length: 0.2, chamferRadius: 0.05)
         barrierGeo.firstMaterial?.diffuse.contents = UIColor.white
         
         let frontBarrier = SCNNode(geometry: barrierGeo)
-        frontBarrier.position = SCNVector3(0, 0.2, startZ + totalZ + 1.5) // Kameraya yakın olan taraf
+        frontBarrier.position = SCNVector3(0, 0.2, startZ + totalZ + 1.5)
         newScene.rootNode.addChildNode(frontBarrier)
         
         let backBarrier = SCNNode(geometry: barrierGeo)
-        backBarrier.position = SCNVector3(0, 0.2, startZ - 1.5) // Uzak olan taraf
+        backBarrier.position = SCNVector3(0, 0.2, startZ - 1.5)
         newScene.rootNode.addChildNode(backBarrier)
         
-        // Bitiş Çizgisi
         let finishGeo = SCNBox(width: 1.0, height: 0.05, length: Double(trackLength), chamferRadius: 0)
         let finishMaterial = SCNMaterial()
         finishMaterial.diffuse.contents = createCheckerboardTexture()
@@ -279,24 +280,34 @@ extension SimulationViewHorse3D {
         let finishNode = SCNNode(geometry: finishGeo); finishNode.position = SCNVector3(finishX, 0, 0)
         newScene.rootNode.addChildNode(finishNode)
         
-        // Atları Sahneye Ekleme
+        horseBaseSpeeds.removeAll()
         for (index, at) in atlar.enumerated() {
             let container = SCNNode()
             let zPos = startZ + Float(index) * spacing
             container.position = SCNVector3(startX, 0, zPos)
             
             let horseModelNode = getHorseModel(number: at.NO ?? "0")
-            
             container.addChildNode(horseModelNode)
-            newScene.rootNode.addChildNode(container)
             
+            newScene.rootNode.addChildNode(container)
             horseNodes[at.id] = container
-            horseProgress[at.id] = 0.0
+            
+            let agf = Float(at.AGF1?.replacingOccurrences(of: ",", with: ".") ?? "5.0") ?? 5.0
+            let agfBonus = (agf / 100.0) * 0.015
+            let dailyForm = Float.random(in: -0.01...0.015)
+            
+            horseBaseSpeeds[at.id] = 0.035 + agfBonus + dailyForm
         }
         self.scene = newScene
+        
+        // YENİ: Sahne yüklendikten saliseler sonra bacakları KESİN olarak dondur!
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            for node in self.horseNodes.values {
+                node.isPaused = true
+            }
+        }
     }
     
-    // Çıkartma iptal edildi, sadece model don rengine boyanıyor
     private func getHorseModel(number: String) -> SCNNode {
         let finalNode = SCNNode()
         
@@ -310,11 +321,11 @@ extension SimulationViewHorse3D {
             wrapperNode.eulerAngles = SCNVector3(0, Float.pi / 2, 0)
             
             let naturalCoatColors: [UIColor] = [
-                UIColor(red: 0.35, green: 0.20, blue: 0.10, alpha: 1.0), // Koyu Doru
-                UIColor(red: 0.60, green: 0.30, blue: 0.15, alpha: 1.0), // Al
-                UIColor(red: 0.85, green: 0.85, blue: 0.85, alpha: 1.0), // Kır
-                UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0), // Yağız
-                UIColor(red: 0.50, green: 0.25, blue: 0.15, alpha: 1.0)  // Doru
+                UIColor(red: 0.35, green: 0.20, blue: 0.10, alpha: 1.0),
+                UIColor(red: 0.60, green: 0.30, blue: 0.15, alpha: 1.0),
+                UIColor(red: 0.85, green: 0.85, blue: 0.85, alpha: 1.0),
+                UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
+                UIColor(red: 0.50, green: 0.25, blue: 0.15, alpha: 1.0)
             ]
             let colorIndex = (Int(number) ?? 0) % naturalCoatColors.count
             let selectedCoatColor = naturalCoatColors[colorIndex]
@@ -336,36 +347,52 @@ extension SimulationViewHorse3D {
     }
     
     private func updateRaceLogic() {
+        // YENİ: Saniyede 60 kere isPaused ataması YAPTIRMIYORUZ! Sadece return ile çıkıyoruz.
         guard isSimulating && !finishLineReached else { return }
+        
         guard let atlar = kosu.atlar else { return }
         
         var leaderX: Float = startX
+        let currentTime = CACurrentMediaTime()
         
-        for at in atlar {
+        for (index, at) in atlar.enumerated() {
             guard let node = horseNodes[at.id] else { continue }
             
-            var speed = Float.random(in: 0.03...0.06)
-            if let agf = Float(at.AGF1?.replacingOccurrences(of: ",", with: ".") ?? "0") {
-                speed += (agf / 100.0) * 0.02
-            }
+            let baseSpeed = horseBaseSpeeds[at.id] ?? 0.04
+            let phase = Float(index) * 2.0
+            let surge = sin(Float(currentTime) * 0.8 + phase) * 0.015
             
-            node.position.x += speed
+            let finalSpeed = baseSpeed + surge
+            node.position.x += finalSpeed
+            
             if node.position.x > leaderX { leaderX = node.position.x }
             
             if node.position.x >= finishX {
                 isSimulating = false
                 finishLineReached = true
                 withAnimation { winnerHorse = at }
+                
+                // Photo Finish Anı! Çizgiyi geçer geçmez dondur!
+                for n in horseNodes.values {
+                    n.isPaused = true
+                }
             }
         }
         
-        // YENİ: Anlık sıralamayı güncelleme
-        let sortedHorses = atlar.sorted { horse1, horse2 in
-            let pos1 = horseNodes[horse1.id]?.position.x ?? 0
-            let pos2 = horseNodes[horse2.id]?.position.x ?? 0
-            return pos1 > pos2
+        if currentTime - lastLeaderboardUpdate > 0.5 {
+            let sortedHorses = atlar.sorted { horse1, horse2 in
+                let pos1 = horseNodes[horse1.id]?.position.x ?? 0
+                let pos2 = horseNodes[horse2.id]?.position.x ?? 0
+                return pos1 > pos2
+            }
+            
+            if currentRanking.map({ $0.id }) != sortedHorses.map({ $0.id }) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    currentRanking = sortedHorses
+                }
+            }
+            lastLeaderboardUpdate = currentTime
         }
-        currentRanking = sortedHorses
         
         let targetCamX = max(startX + 5, leaderX - 8.0)
         cameraNode.position.x += (targetCamX - cameraNode.position.x) * 0.05
