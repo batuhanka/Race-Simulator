@@ -115,7 +115,6 @@ struct MainView: View {
             }
             .navigationDestination(isPresented: $showSimulation) {
                 if races.isEmpty {
-                    // Eğer o güne ait hiç şehir yoksa
                     VStack(spacing: 20) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 50))
@@ -124,11 +123,10 @@ struct MainView: View {
                             .foregroundColor(.white)
                     }
                 } else {
-                    // Simülasyon Kurulum (Setup) ekranına yönlendir
                     SimulationSetupView(
                         selectedDate: selectedDate,
                         availableCities: races,
-                        initialCity: selectedRace // Eğer MainView'da zaten bir şehir seçiliyse onu aktarır
+                        initialCity: selectedRace 
                     )
                 }
             }
