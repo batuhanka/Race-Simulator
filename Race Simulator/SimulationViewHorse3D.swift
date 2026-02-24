@@ -425,7 +425,7 @@ extension SimulationViewHorse3D {
             let zPos = startZ + Float(index) * spacing
             container.position = SCNVector3(startX, 0, zPos)
             
-            let horseModelNode = getHorseModel(number: at.NO ?? "0")
+            let horseModelNode = getHorseModel(at: at)
             container.addChildNode(horseModelNode)
             
             newScene.rootNode.addChildNode(container)
@@ -446,6 +446,42 @@ extension SimulationViewHorse3D {
         }
     }
     
+    private func getHorseModel(at: Horse) -> SCNNode {
+        let finalNode = SCNNode()
+        
+        if let horseScene = SCNScene(named: "thehorse.usdz") {
+            let wrapperNode = SCNNode()
+            for child in horseScene.rootNode.childNodes {
+                wrapperNode.addChildNode(child.clone())
+            }
+            
+            wrapperNode.scale = SCNVector3(0.01, 0.01, 0.01)
+            wrapperNode.eulerAngles = SCNVector3(0, Float.pi / 2, 0)
+            
+            var realisticCoatColor = UIColor(at.coatTheme.bg)
+            
+            if at.coatTheme.bg == .clear {
+                realisticCoatColor = UIColor(red: 0.50, green: 0.25, blue: 0.15, alpha: 1.0)
+            }
+            
+            wrapperNode.enumerateChildNodes { (child, _) in
+                if let geometry = child.geometry {
+                    for material in geometry.materials {
+                        let matName = material.name?.lowercased() ?? ""
+                        if !matName.contains("jockey") && !matName.contains("saddle") && !matName.contains("cloth") {
+                            material.multiply.contents = realisticCoatColor
+                        }
+                    }
+                }
+            }
+            
+            finalNode.addChildNode(wrapperNode)
+        }
+        
+        return finalNode
+    }
+    
+    /*
     private func getHorseModel(number: String) -> SCNNode {
         let finalNode = SCNNode()
         
@@ -465,6 +501,7 @@ extension SimulationViewHorse3D {
                 UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
                 UIColor(red: 0.50, green: 0.25, blue: 0.15, alpha: 1.0)
             ]
+        
             let colorIndex = (Int(number) ?? 0) % naturalCoatColors.count
             let selectedCoatColor = naturalCoatColors[colorIndex]
             
@@ -478,11 +515,13 @@ extension SimulationViewHorse3D {
                     }
                 }
             }
+            
             finalNode.addChildNode(wrapperNode)
         }
         
         return finalNode
     }
+    */
     
     private func updateRaceLogic() {
         guard isSimulating && !finishLineReached else { return }

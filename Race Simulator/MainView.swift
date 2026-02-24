@@ -16,7 +16,7 @@ struct MainView: View {
     // MARK: Binding
     @Binding var selectedBottomTab: Int
     
-     // MARK: - Helpers
+    // MARK: - Helpers
     let parser = JsonParser()
     
     // MARK: - Date Formatters
@@ -77,6 +77,7 @@ struct MainView: View {
                     VStack(spacing: 25) {
                         dynamicRaceProgramSection
                         simulationCardSection
+                        tjkTvCardSection
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
@@ -126,7 +127,7 @@ struct MainView: View {
                     SimulationSetupView(
                         selectedDate: selectedDate,
                         availableCities: races,
-                        initialCity: selectedRace 
+                        initialCity: selectedRace
                     )
                 }
             }
@@ -193,6 +194,7 @@ struct MainView: View {
                 }
                 .buttonStyle(.plain)
             }
+            
             .padding(.vertical, 12)
             .padding(.horizontal, 20)
             .background(
@@ -239,7 +241,7 @@ struct MainView: View {
                 Image("simulasyon")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 320, height: 100)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                 
                 LinearGradient(
@@ -264,11 +266,57 @@ struct MainView: View {
                     
                     Spacer()
                     
-                    // Sağdaki ikon (RaceCardButton ile aynı stil)
-                    Image(systemName: "sparkles.tv.fill")
-                        .font(.title2)
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundColor(.cyan)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 25)
+            }
+            .frame(height: 110)
+            .frame(maxWidth: .infinity)
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 6)
+        }
+        .buttonStyle(CardPressEffectStyle())
+    }
+    
+    // MARK: - TJK TV KARTI
+    private var tjkTvCardSection: some View {
+        Button(action: {
+            if let url = URL(string: "https://www.youtube.com/watch?v=g89RQMJtK6E") {
+                UIApplication.shared.open(url)
+            }
+        }) {
+            ZStack {
+                
+                Image("tjktv")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.black.opacity(0.85),
+                        Color.black.opacity(0.4),
+                        Color.clear
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                
+                HStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TJK TV")
+                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .tracking(1)
+                    }
+                    
+                    Spacer()
+                    
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 25)

@@ -57,7 +57,7 @@ struct RaceCardButton: View {
                 Image(getBackgroundImageName())
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 320, height: 100)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                 
                 // 2. Gradyan Katmanı (Yazıların okunması için)
@@ -82,6 +82,7 @@ struct RaceCardButton: View {
                     
                     Spacer()
                     
+                    /*
                     if isFetching {
                         ProgressView()
                             .tint(.white)
@@ -91,6 +92,7 @@ struct RaceCardButton: View {
                             .font(.title2)
                             .symbolRenderingMode(.hierarchical)
                     }
+                    */
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 25)

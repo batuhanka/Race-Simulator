@@ -41,33 +41,7 @@ private func parseSonYaris(_ veri: String) -> some View {
 struct ListItemView: View {
     let at: Horse
     
-    // YENİ: Yaş verisinden (Örn: "4y d a") atın don rengini (k, a, d) tespit eden fonksiyon
-    private func getCoatTheme(from yas: String?) -> (bg: Color, fg: Color) {
-        guard let yas = yas else { return (.clear, .secondary) }
-        
-        let lowerYas = yas.lowercased()
-        let parts = lowerYas.split(separator: " ")
-        
-        var colorCode = ""
-        // Formata uyuyorsa 2. kelimeyi (ortadaki harfi) al (Örn: ["4y", "d", "a"] -> "d")
-        if parts.count >= 2 {
-            colorCode = String(parts[1])
-        } else {
-            // Boşluk hatası varsa manuel güvenlik kontrolü
-            if lowerYas.contains(" k ") { colorCode = "k" }
-            else if lowerYas.contains(" a ") { colorCode = "a" }
-            else if lowerYas.contains(" d ") { colorCode = "d" }
-        }
-        
-        switch colorCode {
-        case "k": return (Color.gray.opacity(0.9), .white)        // Kır -> Gri/Beyaz
-        case "a": return (Color.orange.opacity(0.9), .white)      // Al -> Kızıl/Turuncu
-        case "d": return (Color.brown.opacity(0.9), .white)       // Doru -> Kahverengi
-        default: return (.clear, .secondary) // Bulunamazsa standart arka plansız metin
-        }
-    }
     
-    // YENİ: İçinde Sıra ve Yüzde yazan Oyun Tarzı Güç Barı
     @ViewBuilder
     private func agfProgressBar(sira: Int?, agf: String?, colors: [Color]) -> some View {
         let cleanString = agf?.replacingOccurrences(of: ",", with: ".") ?? "0"
@@ -218,8 +192,7 @@ struct ListItemView: View {
                 
                 HStack(spacing: 4) {
                     
-                    // YENİ: Renk temasını çekip yaş verisini etiket (badge) gibi gösteriyoruz
-                    let coatTheme = getCoatTheme(from: at.YAS)
+                    let coatTheme = at.coatTheme
                     Text("\(at.YAS ?? "")")
                         .font(.system(size: 9.5, weight: coatTheme.bg == .clear ? .regular : .semibold))
                         .foregroundColor(coatTheme.fg)
@@ -302,7 +275,7 @@ struct CustomCorners: Shape {
         KOD: "123",
         NO: "4",
         AD: "BOLD PILOT",
-        YAS: "4y d a",
+        YAS: "2y y a",
         KILO: 58.0,
         BABA: "PERSIAN BOLD",
         ANNE: "ROSA D'OR",
