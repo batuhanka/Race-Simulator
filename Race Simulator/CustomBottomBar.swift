@@ -4,6 +4,7 @@
 //
 //  Created by Batuhan KANDIRAN on 28.12.2025.
 //
+
 import SwiftUI
 
 // MARK: - CUSTOM BOTTOM BAR
@@ -16,63 +17,58 @@ struct CustomBottomBar: View {
 
             Spacer()
             
-            Rectangle()
-                .fill(Color.white.opacity(0.08))
-                .frame(height: 0.1)
-
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
+            HStack(alignment: .center, spacing: 0) {
 
                 BottomTabItem(
                     icon: "house.fill",
                     title: "Anasayfa",
                     active: selectedBottomTab == 0,
                     action: { selectedBottomTab = 0 }
-                ).id("tab_0")
+                )
 
                 BottomTabItem(
                     icon: "newspaper.fill",
                     title: "Program",
                     active: selectedBottomTab == 1,
                     action: { selectedBottomTab = 1 }
-                ).id("tab_1")
+                )
 
                 BottomTabItem(
                     icon: "brain.fill",
                     title: "Tay Zeka",
                     active: selectedBottomTab == 2,
                     action: { selectedBottomTab = 2 }
-                ).id("tab_2")
+                )
                 
                 BottomTabItem(
                     icon: "tablecells.fill",
                     title: "AGF",
                     active: selectedBottomTab == 3,
                     action: { selectedBottomTab = 3 }
-                ).id("tab_3")
+                )
                 
                 BottomTabItem(
                     icon: "flag.fill",
                     title: "Sonuçlar",
                     active: selectedBottomTab == 4,
                     action: { selectedBottomTab = 4 }
-                ).id("tab_4")
+                )
             }
-            
-            .padding(.vertical, 8)
-            .padding(.horizontal, 2)
-            .background(Color.black.opacity(0.9))
-            .clipShape(RoundedRectangle(cornerRadius: 25, style: .continuous))
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background(Color.black.opacity(0.95))
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 25, style: .continuous)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                Capsule()
+                    .stroke(Color.white.opacity(0.15), lineWidth: 2)
             )
+            .shadow(color: .black.opacity(0.6), radius: 15, x: 0, y: 16)
         }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
-        .ignoresSafeArea(.container, edges: .bottom)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 14)
+        .ignoresSafeArea(edges: .bottom)
     }
 }
-
 
 // MARK: - TAB ITEM
 struct BottomTabItem: View {
@@ -84,32 +80,40 @@ struct BottomTabItem: View {
 
     var body: some View {
         Button(action: {
-            withAnimation(.easeInOut(duration: 0.3)) {
+            // Animasyonu biraz daha tatlı bir "yay" (spring) efektine çevirdik
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 action()
             }
         }) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .frame(height: 22)
+                
+                ZStack {
+                    Circle()
+                        .fill(active ? Color.cyan.opacity(0.18) : Color.clear)
+                        .frame(width: 46, height: 46)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: active ? .bold : .regular))
+                        .foregroundColor(active ? .cyan : .gray)
+                        .scaleEffect(active ? 1.5 : 1.0)
+                }
                 
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: active ? .bold : .medium))
+                    .foregroundColor(active ? .cyan : .gray)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .frame(maxWidth: .infinity)
-            .foregroundColor(active ? .cyan : .gray)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 2)
-            .background(
-                active ? Color.cyan.opacity(0.15) : Color.clear
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .transition(.scale.combined(with: .opacity))
         }
         .buttonStyle(.plain)
     }
 }
 
 #Preview {
-    CustomBottomBar(selectedBottomTab: .constant(3))
+    ZStack {
+        Color.gray.opacity(0.2).ignoresSafeArea()
+        CustomBottomBar(selectedBottomTab: .constant(2))
+    }
 }
+

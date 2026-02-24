@@ -32,13 +32,39 @@ struct SimulationSetupView: View {
         return f
     }()
     
+    // MARK: - TOP BAR
+    private var topNavigationBar: some View {
+        HStack {
+            
+            
+            HStack(spacing: 2) {
+                Text("TAY")
+                    .font(.system(size: 24, weight: .black))
+                    .foregroundColor(.white.opacity(0.4))
+                Text("ZEKA")
+                    .font(.system(size: 24, weight: .black))
+                    .foregroundColor(.cyan.opacity(0.9))
+            }
+            
+            Spacer()
+            
+            Image("tayzekatransparent")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+        }
+        .padding(.horizontal)
+        .frame(height: 60)
+        .background(Color.black)
+    }
+    
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 20) {
                 
-                headerSection
+                topNavigationBar
                 
                 if isFetching {
                     ProgressView().tint(.cyan).scaleEffect(1.5)
@@ -81,14 +107,6 @@ struct SimulationSetupView: View {
 // MARK: - COMPONENTS
 extension SimulationSetupView {
     
-    private var headerSection: some View {
-        VStack(spacing: 5) {
-            Image("tayzekatransparent")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 120)
-        }
-    }
     
     private var cityPickerSection: some View {
         VStack(spacing: 10) {

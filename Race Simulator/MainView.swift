@@ -76,8 +76,10 @@ struct MainView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 25) {
                         dynamicRaceProgramSection
-                        simulationCardSection
-                        tjkTvCardSection
+                        if !races.isEmpty {
+                            simulationCardSection
+                            tjkTvCardSection
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
