@@ -41,6 +41,32 @@ private func parseSonYaris(_ veri: String) -> some View {
 struct ListItemView: View {
     let at: Horse
     
+    // YENİ: Yaş verisinden (Örn: "4y d a") atın don rengini (k, a, d) tespit eden fonksiyon
+    private func getCoatTheme(from yas: String?) -> (bg: Color, fg: Color) {
+        guard let yas = yas else { return (.clear, .secondary) }
+        
+        let lowerYas = yas.lowercased()
+        let parts = lowerYas.split(separator: " ")
+        
+        var colorCode = ""
+        // Formata uyuyorsa 2. kelimeyi (ortadaki harfi) al (Örn: ["4y", "d", "a"] -> "d")
+        if parts.count >= 2 {
+            colorCode = String(parts[1])
+        } else {
+            // Boşluk hatası varsa manuel güvenlik kontrolü
+            if lowerYas.contains(" k ") { colorCode = "k" }
+            else if lowerYas.contains(" a ") { colorCode = "a" }
+            else if lowerYas.contains(" d ") { colorCode = "d" }
+        }
+        
+        switch colorCode {
+        case "k": return (Color.gray.opacity(0.9), .white)        // Kır -> Gri/Beyaz
+        case "a": return (Color.orange.opacity(0.9), .white)      // Al -> Kızıl/Turuncu
+        case "d": return (Color.brown.opacity(0.9), .white)       // Doru -> Kahverengi
+        default: return (.clear, .secondary) // Bulunamazsa standart arka plansız metin
+        }
+    }
+    
     // YENİ: İçinde Sıra ve Yüzde yazan Oyun Tarzı Güç Barı
     @ViewBuilder
     private func agfProgressBar(sira: Int?, agf: String?, colors: [Color]) -> some View {
@@ -53,7 +79,7 @@ struct ListItemView: View {
         ZStack(alignment: .leading) {
             // Arka Plan (Boş Bar)
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.25))
+                .fill(Color.black.opacity(0.6))
             
             // Dolu Kısım (Gradient)
             RoundedRectangle(cornerRadius: 4)
@@ -63,12 +89,12 @@ struct ListItemView: View {
             // Üzerindeki Yazı (Gölgesi sayesinde dolu veya boş alanda da net okunur)
             HStack(spacing: 2) {
                 Text("\(sira ?? 0).")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: 8, weight: .heavy))
                 Text("%\(agf ?? "0")")
                     .font(.system(size: 8, weight: .heavy))
             }
             .foregroundColor(.white)
-            .shadow(color: .black, radius: 1, x: 0.5, y: 0.5) // Yazının her zeminde okunmasını sağlar
+            .shadow(color: .black, radius:1, x: 0.5, y: 0.5) // Yazının her zeminde okunmasını sağlar
             .padding(.leading, 4)
         }
         .frame(width: barWidth, height: barHeight)
@@ -84,6 +110,7 @@ struct ListItemView: View {
                 
                 Color(.systemBackground)
                 
+                // FORMA ALANI DARALTILDI (%55 -> %35)
                 GeometryReader { geo in
                     if let formaLink = at.FORMA, let url = URL(string: formaLink) {
                         AsyncImage(url: url) { phase in
@@ -93,10 +120,10 @@ struct ListItemView: View {
                                 Color(at.horseColor).opacity(0.4)
                             }
                         }
-                        .frame(width: geo.size.width * 0.55, height: 38)
+                        .frame(width: geo.size.width * 0.38, height: 38) // Genişlik %35'e çekildi
                         .mask(
                             LinearGradient(gradient: Gradient(stops: [
-                                .init(color: .black, location: 0.7),
+                                .init(color: .black, location: 0.5),
                                 .init(color: .clear, location: 1.0)
                             ]), startPoint: .leading, endPoint: .trailing)
                         )
@@ -106,9 +133,8 @@ struct ListItemView: View {
                 
                 GeometryReader { geo in
                     LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: geo.size.width * 0.4)
+                        .frame(width: geo.size.width * 0.30)
                 }
-                
                 // İÇERİK
                 HStack(alignment: .center, spacing: 0) {
                     
@@ -130,12 +156,17 @@ struct ListItemView: View {
                             .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
                             .lineLimit(1)
                         
-                        if let ekuri = at.EKURI, ekuri != "false" {
-                            AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(ekuri).gif")) { phase in
-                                if case .success(let image) = phase {
-                                    image.resizable().scaledToFit().frame(width: 10, height: 10)
+                        // Sadece TJK CDN'den gelen GIF
+                        let cleanEkuri = at.EKURI?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        if !cleanEkuri.isEmpty && cleanEkuri != "false" && cleanEkuri != "0" {
+                            AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(cleanEkuri).gif")) { phase in
+                                if let image = phase.image {
+                                    image.resizable().scaledToFit()
+                                } else {
+                                    Color.clear
                                 }
                             }
+                            .frame(width: 16, height: 16)
                         }
                     }
                     .padding(.leading, 4)
@@ -186,16 +217,30 @@ struct ListItemView: View {
             VStack(alignment: .leading, spacing: 5) {
                 
                 HStack(spacing: 4) {
+                    
+                    // YENİ: Renk temasını çekip yaş verisini etiket (badge) gibi gösteriyoruz
+                    let coatTheme = getCoatTheme(from: at.YAS)
                     Text("\(at.YAS ?? "")")
+                        .font(.system(size: 9.5, weight: coatTheme.bg == .clear ? .regular : .semibold))
+                        .foregroundColor(coatTheme.fg)
+                        .padding(.horizontal, coatTheme.bg == .clear ? 0 : 4)
+                        .padding(.vertical, coatTheme.bg == .clear ? 0 : 2)
+                        .background(coatTheme.bg)
+                        .cornerRadius(3)
+                    
                     Text("•")
+                        .foregroundColor(.secondary)
+                    
                     Text(String(format: "%.1f", at.KILO ?? 0) + "kg")
+                        .foregroundColor(.secondary)
+                    
                     if let taki = at.TAKI, !taki.isEmpty {
                         Text("•")
+                            .foregroundColor(.secondary)
                         Text(taki).fontWeight(.semibold).foregroundColor(.green)
                     }
                 }
                 .font(.system(size: 9.5))
-                .foregroundColor(.secondary)
                 
                 Text("\(at.BABA ?? "") / \(at.ANNE ?? "")")
                     .font(.system(size: 9.5))
@@ -212,14 +257,11 @@ struct ListItemView: View {
                 .font(.system(size: 10))
                 .foregroundColor(.primary)
                 
-                // YENİ: AGF 1 ve AGF 2 Güç Barları yan yana
                 HStack(spacing: 6) {
-                    
                     if let agf1 = at.AGF1, !agf1.isEmpty {
                         agfProgressBar(sira: at.AGFSIRA1, agf: agf1, colors: [.cyan, .blue])
                     }
                     
-                    // Eğer AGF2 adında bir değişkenin varsa onu da turuncu bir güç barıyla çizdirecek
                     if let agf2 = at.AGF2, !agf2.isEmpty {
                         agfProgressBar(sira: at.AGFSIRA2, agf: agf2, colors: [.cyan, .blue])
                     }
@@ -243,7 +285,6 @@ struct ListItemView: View {
         .padding(.vertical, 3)
     }
 }
-
 // MARK: - KÖŞE YUVARLATMA YARDIMCISI
 struct CustomCorners: Shape {
     var corners: UIRectCorner
@@ -273,12 +314,12 @@ struct CustomCorners: Shape {
         FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg",
         KOSMAZ: false,
         APRANTIFLG: false,
-        EKURI: "false",
+        EKURI: "1",
         TAKI: "KG K GKR",
         AGF1: "55,50",
         AGFSIRA1: 1,
-        AGF2: "18,20", // İkinci barı görmek için eklendi (Modeline eklemeyi unutma)
-        AGFSIRA2: 2,   // İkinci barın sırası
+        AGF2: "18,20",
+        AGFSIRA2: 2,
         SON6: "C1K2S3K4C1"
     )
     
