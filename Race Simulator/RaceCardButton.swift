@@ -76,23 +76,12 @@ struct RaceCardButton: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
                             .font(.system(size: 22, weight: .black, design: .rounded))
-                            .tracking(1) // Harf arası boşluk
+                            .tracking(1)
                         
                     }
                     
                     Spacer()
                     
-                    /*
-                    if isFetching {
-                        ProgressView()
-                            .tint(.white)
-                            .scaleEffect(1.2)
-                    } else {
-                        Image(systemName: "chevron.right.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                    */
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 25)

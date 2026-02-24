@@ -32,6 +32,8 @@ struct SimulationSetupView: View {
         return f
     }()
     
+    
+    
     // MARK: - TOP BAR
     private var topNavigationBar: some View {
         HStack {
@@ -63,8 +65,7 @@ struct SimulationSetupView: View {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 20) {
-                
-                topNavigationBar
+
                 
                 if isFetching {
                     ProgressView().tint(.cyan).scaleEffect(1.5)
@@ -86,6 +87,31 @@ struct SimulationSetupView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 2) {
+                    Text("TAY")
+                        .font(.system(size: 22, weight: .black))
+                        .foregroundColor(.white.opacity(0.4))
+                    Text("ZEKA")
+                        .font(.system(size: 22, weight: .black))
+                        .foregroundColor(.cyan.opacity(0.9))
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            ToolbarItem(placement: .topBarTrailing) {
+                Image("tayzekatransparent")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+            }
+        }
+        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear {
             if let city = initialCity ?? availableCities.first {
                 selectedCity = city

@@ -223,7 +223,7 @@ struct ListItemView: View {
                     Text("HP: \(at.HANDIKAP ?? "")")
                     Text("KGS: \(at.KGS ?? "")")
                     Spacer()
-                    Text(at.ANTRENORADI ?? "")
+                    Text(at.SAHIPADI ?? "")
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
@@ -241,7 +241,7 @@ struct ListItemView: View {
                     
                     Spacer()
                     
-                    Text(at.SAHIPADI ?? "")
+                    Text("Ant: \(at.ANTRENORADI ?? "")")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                         .lineLimit(1)

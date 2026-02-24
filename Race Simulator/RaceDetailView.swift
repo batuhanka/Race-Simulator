@@ -374,18 +374,15 @@ extension RaceDetailView {
                         }
                     }
                 }
-            } label: {
+            } label:{
                 HStack(spacing: 6) {
                     Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
-                    Image(systemName: "chevron.down.circle.fill")
-                        .foregroundColor(.cyan)
+                        .font(.system(size: 18, weight: .bold))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
+                .foregroundColor(.white)
             }
-            
         }
     }
 }

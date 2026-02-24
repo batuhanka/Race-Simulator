@@ -44,7 +44,17 @@ struct ResultRowView: View {
                     
                     
                     HStack(spacing: 4) {
-                        Text(finisher.YAS ?? "")
+                        
+                        let coatTheme = finisher.coatTheme
+                        Text("\(finisher.YAS ?? "")")
+                            .font(.system(size: 9.5, weight: coatTheme.bg == .clear ? .regular : .semibold))
+                            .foregroundColor(coatTheme.fg)
+                            .padding(.horizontal, coatTheme.bg == .clear ? 0 : 4)
+                            .padding(.vertical, coatTheme.bg == .clear ? 0 : 2)
+                            .background(coatTheme.bg)
+                            .cornerRadius(3)
+                        
+                        //Text(finisher.YAS ?? "")
                         Text(String(format: "%.1f", finisher.KILO ?? 0) + "kg")
                         Text(finisher.TAKI ?? "").fontWeight(.semibold).foregroundColor(.green)
                         
@@ -90,7 +100,7 @@ struct ResultRowView: View {
             }
             
             
-             VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
                 
                 HStack {
                     
@@ -102,7 +112,7 @@ struct ResultRowView: View {
                         Text(finisher.SAHIPADI ?? "")
                             .font(.caption2)
                     }
-                                        
+                    
                     Spacer()
                     
                     if let fark = finisher.FARK, !fark.isEmpty {
@@ -203,7 +213,7 @@ struct ResultRowView: View {
         }
         .padding()
     }
-    .background(Color(.systemGroupedBackground)) // Liste arka planı hissi verir
+    .background(Color(.systemGroupedBackground))
 }
 
 // MARK: - Mock Helper

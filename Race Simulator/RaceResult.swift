@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct RaceResult: Codable {
     let KOD: String?
@@ -45,6 +46,47 @@ struct HorseResult: Codable, Identifiable {
 
     var rankInt: Int {
         Int(SONUC ?? "999") ?? 999
+    }
+    
+    var DON: String {
+        guard let yas = YAS else { return "" }
+        let lowerYas = yas.lowercased()
+        let parts = lowerYas.split(separator: " ")
+        
+        if parts.count >= 2 {
+            return String(parts[1])
+        } else {
+            if lowerYas.contains(" k ") { return "k" }
+            else if lowerYas.contains(" a ") { return "a" }
+            else if lowerYas.contains(" d ") { return "d" }
+            else if lowerYas.contains(" y ") { return "y" }
+        }
+        return ""
+    }
+    
+    var coatTheme: (bg: Color, fg: Color) {
+        let donRengi = self.DON
+        
+        var age = 3
+        if let yasStr = self.YAS {
+            let parts = yasStr.lowercased().split(separator: " ")
+            if let firstPart = parts.first {
+                let ageNumStr = firstPart.replacingOccurrences(of: "y", with: "")
+                age = Int(ageNumStr) ?? 3
+            }
+        }
+        
+        let clampedAge = min(max(Double(age), 2.0), 10.0)
+        let fadeFactor = donRengi == "k" ? 0.05 : 0.04
+        let calculatedOpacity = max(0.60, 0.95 - ((clampedAge - 2.0) * fadeFactor))
+        
+        switch donRengi {
+        case "k": return (Color.gray.opacity(calculatedOpacity), .white)         // Kır
+        case "a": return (Color.orange.opacity(calculatedOpacity), .white)       // Al
+        case "d": return (Color.brown.opacity(calculatedOpacity), .white)        // Doru
+        case "y": return (Color.black.opacity(calculatedOpacity), .white)        // Yağız
+        default: return (.clear, .secondary)
+        }
     }
 
     enum CodingKeys: String, CodingKey {

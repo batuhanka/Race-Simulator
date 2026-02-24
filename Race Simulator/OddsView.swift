@@ -131,6 +131,7 @@ struct Kosul: Codable {
 
 // MARK: - Main View
 struct OddsView: View {
+    
     let selectedDate: Date
     @State private var selectedTab: Int = 0
     @State private var runsData: [String: [String]] = [:]
@@ -176,6 +177,8 @@ struct OddsView: View {
             }
         }
         .background(Color(white: 0.12))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .task {
             await loadInitialData()
         }
@@ -203,6 +206,7 @@ extension OddsView {
     
     private var citySelectionBar: some View {
         HStack {
+            
             Menu {
                 ForEach(cities, id: \.self) { city in
                     Button(city) {
@@ -212,7 +216,7 @@ extension OddsView {
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text(selectedCity ?? "Şehir Seçin")
                         .font(.system(size: 18, weight: .bold))
                     Image(systemName: "chevron.down")
@@ -626,6 +630,8 @@ struct PulseModifier: ViewModifier {
 }
 
 #Preview {
-    OddsView(selectedDate: Date())
-        .preferredColorScheme(.light)
+    NavigationStack {
+        OddsView(selectedDate: Date())
+            .preferredColorScheme(.dark)
+    }
 }
