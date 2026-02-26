@@ -73,64 +73,16 @@ struct BahisOran: Codable {
     }
 }
 
-struct ProgramResponse: Codable {
-    let kosular: [Kosul]?
-    let agf: [AGFGrubu]?
+// Yeni ProgramResponse, ana 'kosular' dizisini Race objeleri olarak alır.
+struct ProgramResponse: Decodable {
+    let kosular: [Race]?
 }
 
-struct AGFGrubu: Codable {
-    let bahis: String?
-    let kosular: [AGFKosu]?
-    
-    enum CodingKeys: String, CodingKey {
-        case bahis = "BAHIS", kosular
-    }
-}
-
-struct AGFKosu: Codable {
-    let no: String?
-    let atlar: [AGFAt]?
-    
-    enum CodingKeys: String, CodingKey {
-        case no = "NO", atlar
-    }
-}
-
-struct AGFAt: Codable {
-    let no: String?
-    let ad: String?
-    let jokey: String?
-    let agfOran: String?
-    let agfSiraNo: Int?
-    let kosmaz: Bool?
-    
-    enum CodingKeys: String, CodingKey {
-        case no = "NO", ad = "AD", jokey = "JOKEY"
-        case agfOran = "AGFORAN", agfSiraNo = "AGFSIRANO"
-        case kosmaz = "KOSMAZ"
-    }
-}
-
-struct Kosul: Codable {
-    let no: String?
-    let bilgiTr: String?
-    let cinsDetay: String?
-    let grup: String?
-    let mesafe: String?
-    let pist: String?
-
-    enum CodingKeys: String, CodingKey {
-        case no = "NO"
-        case bilgiTr = "BILGI_TR"
-        case cinsDetay = "CINSDETAY_TR"
-        case grup = "GRUP_TR"
-        case mesafe = "MESAFE"
-        case pist = "PISTADI_TR"
-    }
-}
 
 // MARK: - Main View
 struct OddsView: View {
+    
+    private let separatorWidth: CGFloat = 1.0
     
     let selectedDate: Date
     @State private var selectedTab: Int = 0
@@ -151,6 +103,8 @@ struct OddsView: View {
     @State private var agfBahisTurleri: [String] = ["#", "At", "Jokey", "AGF"]
     
     @State private var raceInfo: String = ""
+    @State private var fetchTask: Task<Void, Never>?
+    @State private var refreshTimer: Timer?
 
     private var turkishDateString: String {
         let formatter = DateFormatter()
@@ -171,9 +125,9 @@ struct OddsView: View {
                 runSelectionBar
                 tabSelectionBar
                 Spacer()
-                statusInfoBar
-                dynamicTableHeader.padding(.horizontal, 8)
-                dynamicMainList.padding(.horizontal, 8)
+                statusInfoBar.padding(.horizontal,8)
+                dynamicTableHeader.padding(.horizontal,8)
+                dynamicMainList.padding(.horizontal,8)
             }
         }
         .background(Color(white: 0.12))
@@ -182,6 +136,8 @@ struct OddsView: View {
         .task {
             await loadInitialData()
         }
+        .onDisappear(perform: stopRefreshTimer)
+        .onChange(of: selectedTab) { _, _ in manageRefreshTimer() }
     }
 }
 
@@ -212,7 +168,7 @@ extension OddsView {
                     Button(city) {
                         selectedCity = city
                         selectedRun = 1
-                        Task { await fetchRaceDetails() }
+                        fetchRaceDetails()
                     }
                 }
             } label: {
@@ -274,7 +230,7 @@ extension OddsView {
                 let kosuNo = "\(index + 1)"
                 Button {
                     selectedRun = index + 1
-                    Task { await fetchRaceDetails() }
+                    fetchRaceDetails()
                 } label: {
                     Text(kosuNo)
                         .font(.system(size: 14, weight: .bold))
@@ -315,12 +271,16 @@ extension OddsView {
                 GeometryReader { geometry in
                     HStack(spacing: 0) {
                         ForEach(0..<headers.count, id: \.self) { index in
-                            Text(headers[index])
-                                .font(.system(size: 11, weight: .bold))
-                                .frame(width: columnWidth(for: index, totalWidth: geometry.size.width))
+                            HStack {
+                                Spacer()
+                                Text(headers[index])
+                                    .font(.system(size: 11, weight: .bold))
+                                Spacer()
+                            }
+                            .frame(width: columnWidth(for: index, totalWidth: geometry.size.width))
                             
                             if index < headers.count - 1 {
-                                Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1)
+                                Rectangle().fill(Color.gray.opacity(0.3)).frame(width: separatorWidth)
                             }
                         }
                     }
@@ -375,29 +335,41 @@ extension OddsView {
                 if index < row.cells.count - 1 {
                     let currentEmpty = row.cells[index].label.isEmpty && row.cells[index].odds.isEmpty
                     if !currentEmpty {
-                        Rectangle().fill(Color.gray.opacity(0.3)).frame(width: 1.5)
+                        Rectangle().fill(Color.gray.opacity(0.3)).frame(width: separatorWidth)
                     }
                 }
             }
         }
-        .frame(height: 48)
     }
     
     private func columnWidth(for index: Int, totalWidth: CGFloat) -> CGFloat {
         let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
         guard !headers.isEmpty else { return 0 }
-        
+
+        let totalSeparatorWidth = separatorWidth * CGFloat(max(0, headers.count - 1))
+        let contentWidth = totalWidth - totalSeparatorWidth
+
+        guard contentWidth > 0 else { return 0 }
+
         if selectedTab == 1 {
+            let firstColumnWidth: CGFloat = 40
+            
+            guard contentWidth > firstColumnWidth else {
+                return contentWidth / CGFloat(headers.count)
+            }
+            
+            let remainingWidth = contentWidth - firstColumnWidth
+            
             switch index {
-            case 0: return 35
-            case 1: return (totalWidth - 35) * 0.40
-            case 2: return (totalWidth - 35) * 0.35
-            case 3: return (totalWidth - 35) * 0.25
-            default: return totalWidth / CGFloat(headers.count)
+            case 0: return firstColumnWidth
+            case 1: return remainingWidth * 0.40
+            case 2: return remainingWidth * 0.35
+            case 3: return remainingWidth * 0.25
+            default: return 0
             }
         }
         
-        return totalWidth / CGFloat(headers.count)
+        return contentWidth / CGFloat(headers.count)
     }
     
     private func cellView(for row: DynamicTableRow, at index: Int, totalWidth: CGFloat) -> some View {
@@ -406,43 +378,90 @@ extension OddsView {
         let headers = selectedTab == 0 ? currentBahisTurleri : agfBahisTurleri
         
         let isGanyanColumn = index < headers.count && headers[index].uppercased().contains("GANYAN")
-        let isAGFColumn = selectedTab == 1 && index < headers.count && headers[index].uppercased() == "AGF"
+        let isAGFColumn = selectedTab == 1 && index == 3
         let isAGFAtColumn = selectedTab == 1 && index == 1
+        let isAGFJokeyColumn = selectedTab == 1 && index == 2
         let shouldShowAsFavori = row.isFavori && (isGanyanColumn || isAGFColumn) && !row.isKosmaz
-        let isKosmazCell = row.isKosmaz && (isGanyanColumn || (selectedTab == 1))
+        let isKosmazCell = row.isKosmaz && (isGanyanColumn || selectedTab == 1)
+        
+        @ViewBuilder
+        var cellContent: some View {
+            if isAGFColumn {
+                if isKosmazCell {
+                    Text("Koşmaz")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.black)
+                } else {
+                    VStack(spacing: 2) {
+                        let hasAGF2 = !cell.odds.isEmpty
+                        
+                        if !cell.label.isEmpty {
+                            Text(cell.label) // AGF1
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                                .modifier(PulseModifier(active: shouldShowAsFavori && !hasAGF2))
+                        }
+                        if hasAGF2 {
+                            Text(cell.odds) // AGF2
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(shouldShowAsFavori ? .green : .primary)
+                                .modifier(PulseModifier(active: shouldShowAsFavori))
+                        }
+                    }
+                }
+            } else {
+                HStack(spacing: 2) {
+                    let labelText = Text(cell.label)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
+
+                    if isAGFJokeyColumn {
+                        labelText
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    } else {
+                        labelText
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    
+                    if (isGanyanColumn || isAGFAtColumn) && !row.ekuriGrubu.isEmpty {
+                        ekuriIcon(for: row.ekuriGrubu)
+                    }
+                    
+                    if selectedTab == 0 {
+                        Spacer(minLength: 2)
+                    }
+                    
+                    if isKosmazCell && isGanyanColumn {
+                        Text("Koşmaz")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.black)
+                    } else {
+                        Text(cell.odds)
+                            .font(.system(size: 13, design: .monospaced))
+                            .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .modifier(PulseModifier(active: shouldShowAsFavori))
+                    }
+                }
+            }
+        }
         
         let viewContent =
             VStack(spacing: 0) {
                 if !isEmpty {
-                    HStack(spacing: 2) {
-                        Text(cell.label)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
-                            .lineLimit(1)
-                            .padding(.leading, (selectedTab == 1 && index == 1) ? 4 : 0)
-                            .minimumScaleFactor(0.7)
+                    HStack {
+                        if selectedTab == 1 { Spacer(minLength: 0) }
                         
-                        if (isGanyanColumn || isAGFAtColumn) && !row.ekuriGrubu.isEmpty {
-                            ekuriIcon(for: row.ekuriGrubu)
-                        }
+                        cellContent
                         
-                        Spacer(minLength: 2)
-                        
-                        if isKosmazCell && (isGanyanColumn || isAGFColumn) {
-                            Text("Koşmaz")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.black)
-                        } else {
-                            Text(cell.odds)
-                                .font(.system(size: 13, design: .monospaced))
-                                .foregroundColor(shouldShowAsFavori ? .green : (isKosmazCell ? .black : .primary))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                                .modifier(PulseModifier(active: shouldShowAsFavori))
-                        }
+                        if selectedTab == 1 { Spacer(minLength: 0) }
                     }
+                    .padding(.vertical, 6)
                     .padding(.horizontal, 4)
-                    .frame(maxHeight: .infinity)
+                    .frame(minHeight: 48)
                     
                     Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1.5)
                 } else {
@@ -465,6 +484,60 @@ extension OddsView {
 
 // MARK: - Data Fetching
 extension OddsView {
+    
+    private func stopRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+    
+    private func startRefreshTimer() {
+        stopRefreshTimer()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
+            Task {
+                await refreshMuhtemellerData()
+            }
+        }
+    }
+    
+    private func manageRefreshTimer() {
+        stopRefreshTimer()
+        
+        guard selectedTab == 0 else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        guard let time = formatter.date(from: raceTime) else { return }
+
+        let calendar = Calendar.current
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        guard let raceDateTime = calendar.date(bySettingHour: timeComponents.hour!, minute: timeComponents.minute!, second: 0, of: selectedDate) else { return }
+        
+        let now = Date()
+        let timeDifference = raceDateTime.timeIntervalSince(now)
+
+        if timeDifference < (30 * 60) && timeDifference > (-10 * 60) {
+            startRefreshTimer()
+        }
+    }
+
+    func refreshMuhtemellerData() async {
+        guard let city = selectedCity, !isLoading else { return }
+        
+        do {
+            let details = try await fetchMuhtemeller(for: city, run: selectedRun)
+            
+            await MainActor.run {
+                let bahisler = details.data?.muhtemeller?.bahisler ?? []
+                parseDataToRows(bahisler: bahisler)
+                
+                self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
+                self.raceStatus = details.data?.muhtemeller?.durum ?? ""
+            }
+        } catch {
+            print("Silent refresh for Muhtemeller failed: \(error.localizedDescription)")
+        }
+    }
+    
     func loadInitialData() async {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
         let dateStr = f.string(from: selectedDate)
@@ -488,44 +561,60 @@ extension OddsView {
                 })).sorted()
                 if selectedCity == nil || !cities.contains(selectedCity!) { selectedCity = cities.first }
                 isLoading = false
-                if selectedCity != nil { Task { await fetchRaceDetails() } }
+                if selectedCity != nil { fetchRaceDetails() }
             }
         } catch { await MainActor.run { isLoading = false } }
     }
     
-    func fetchRaceDetails() async {
+    func fetchRaceDetails() {
+        fetchTask?.cancel()
+        stopRefreshTimer()
+        
         guard let city = selectedCity else { return }
-        await MainActor.run { isLoading = true }
-        do {
-            async let muhtemellerTask = fetchMuhtemeller(for: city, run: selectedRun)
-            async let infoTask = fetchProgramInfo(for: city, run: selectedRun)
-            
-            let (details, programResult) = try await (muhtemellerTask, infoTask)
+        let runToFetch = selectedRun
 
-            await MainActor.run {
-                self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
-                self.raceStatus = details.data?.muhtemeller?.durum ?? ""
-                self.raceInfo = programResult.info
+        fetchTask = Task {
+            await MainActor.run { isLoading = true }
+            do {
+                async let muhtemellerTask = fetchMuhtemeller(for: city, run: runToFetch)
+                async let infoTask = fetchProgramInfo(for: city, run: runToFetch)
                 
-                let bahisler = details.data?.muhtemeller?.bahisler ?? []
-                var ekuriMap: [String: String] = [:]
-                if let ganyanBahis = bahisler.first(where: { $0.tur?.uppercased().contains("GANYAN") == true }),
-                   let muhtemeller = ganyanBahis.muhtemeller {
-                    for m in muhtemeller {
-                        if let horseNo = m.s1, let ekuri = m.e, !ekuri.isEmpty, ekuri != "0" {
-                            ekuriMap[horseNo] = "e\(ekuri)"
+                let (details, programResult) = try await (muhtemellerTask, infoTask)
+
+                try Task.checkCancellation()
+
+                await MainActor.run {
+                    guard runToFetch == self.selectedRun else { return }
+
+                    self.raceTime = details.data?.muhtemeller?.saat ?? "--:--"
+                    self.raceStatus = details.data?.muhtemeller?.durum ?? ""
+                    self.raceInfo = programResult.info
+                    
+                    let bahisler = details.data?.muhtemeller?.bahisler ?? []
+                    var ekuriMap: [String: String] = [:]
+                    if let ganyanBahis = bahisler.first(where: { $0.tur?.uppercased().contains("GANYAN") == true }),
+                       let muhtemeller = ganyanBahis.muhtemeller {
+                        for m in muhtemeller {
+                            if let horseNo = m.s1, let ekuri = m.e, !ekuri.isEmpty, ekuri != "0" {
+                                ekuriMap[horseNo] = "e\(ekuri)"
+                            }
                         }
                     }
-                }
-            
-                parseDataToRows(bahisler: bahisler)
-                parseAGFData(from: programResult.fullResponse, ekuriMap: ekuriMap)
                 
-                self.isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                self.raceInfo = "Veri yüklenemedi"; self.tableRows = []; self.agfTableRows = []; self.isLoading = false
+                    parseDataToRows(bahisler: bahisler)
+                    parseAGFData(from: programResult.fullResponse, ekuriMap: ekuriMap, for: runToFetch)
+                    
+                    self.isLoading = false
+                    manageRefreshTimer()
+                }
+            } catch is CancellationError {
+                // Task was cancelled, do nothing.
+            } catch {
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        self.raceInfo = "Veri yüklenemedi"; self.tableRows = []; self.agfTableRows = []; self.isLoading = false
+                    }
+                }
             }
         }
     }
@@ -549,42 +638,56 @@ extension OddsView {
         let decoded = try JSONDecoder().decode(ProgramResponse.self, from: data)
         
         var infoStr = ""
-        if let kosul = decoded.kosular?.first(where: { $0.no == String(run) }) {
-            infoStr = [kosul.cinsDetay, kosul.grup, kosul.mesafe, kosul.pist].compactMap { $0 }.joined(separator: ", ")
+        if let kosu = decoded.kosular?.first(where: { $0.RACENO == String(run) }) {
+            infoStr = [kosu.CINSDETAY_TR, kosu.GRUP_TR, kosu.MESAFE, kosu.PISTADI_TR].compactMap { $0 }.joined(separator: ", ")
         }
         
         return (infoStr, decoded)
     }
     
-    func parseAGFData(from program: ProgramResponse, ekuriMap: [String: String]) {
-        guard let agfGruplari = program.agf else {
+    func parseAGFData(from program: ProgramResponse, ekuriMap: [String: String], for run: Int) {
+        guard let race = program.kosular?.first(where: { $0.RACENO == String(run) }),
+              let atlar = race.atlar else {
             self.agfTableRows = []
             return
         }
-        
-       let matchingKosu = agfGruplari
-            .compactMap { $0.kosular }
-            .joined()
-            .first(where: { $0.no == String(selectedRun) })
-        
-        guard let atlar = matchingKosu?.atlar else {
-            self.agfTableRows = []
-            return
+
+        let sortedAtlar = atlar.sorted { a, b in
+            let rankA = a.AGFSIRA2 ?? a.AGFSIRA1
+            let rankB = b.AGFSIRA2 ?? b.AGFSIRA1
+
+            if let rankA = rankA, let rankB = rankB {
+                if rankA != rankB {
+                    return rankA < rankB
+                }
+            } else if rankA != nil {
+                return true
+            } else if rankB != nil {
+                return false
+            }
+            
+            return (Int(a.NO ?? "0") ?? 0) < (Int(b.NO ?? "0") ?? 0)
         }
-        
-        self.agfTableRows = atlar.map { at in
+
+        self.agfTableRows = sortedAtlar.compactMap { horse -> DynamicTableRow? in
+            let agfSira = horse.AGFSIRA2 ?? horse.AGFSIRA1
+            guard let finalAgfSira = agfSira else { return nil }
+
             let cells = [
-                TableCell(label: at.no ?? "", odds: ""),
-                TableCell(label: at.ad ?? "", odds: ""),
-                TableCell(label: at.jokey ?? "", odds: ""),
-                TableCell(label: "", odds: "%" + (at.agfOran ?? "0"))
+                TableCell(label: horse.NO ?? "", odds: ""),
+                TableCell(label: horse.AD ?? "", odds: ""),
+                TableCell(label: horse.JOKEYADI ?? "", odds: ""),
+                TableCell(
+                    label: horse.AGF1.map { "%" + $0 } ?? "",
+                    odds: horse.AGF2.map { "%" + $0 } ?? ""
+                )
             ]
             
-            let horseNo = at.no ?? ""
+            let horseNo = horse.NO ?? ""
             
             return DynamicTableRow(
-                isFavori: at.agfSiraNo == 1,
-                isKosmaz: at.kosmaz ?? false,
+                isFavori: finalAgfSira == 1,
+                isKosmaz: horse.KOSMAZ ?? false,
                 ekuriGrubu: ekuriMap[horseNo] ?? "",
                 cells: cells
             )
@@ -635,3 +738,5 @@ struct PulseModifier: ViewModifier {
             .preferredColorScheme(.dark)
     }
 }
+
+
