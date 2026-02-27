@@ -48,8 +48,8 @@ struct CustomBottomBar: View {
                 )
                 
                 BottomTabItem(
-                    icon: "flag.fill",
-                    title: "Sonuçlar",
+                    icon: "ticket.fill",
+                    title: "Kupon",
                     active: selectedBottomTab == 4,
                     action: { selectedBottomTab = 4 }
                 )
@@ -80,7 +80,6 @@ struct BottomTabItem: View {
 
     var body: some View {
         Button(action: {
-            // Animasyonu biraz daha tatlı bir "yay" (spring) efektine çevirdik
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 action()
             }
