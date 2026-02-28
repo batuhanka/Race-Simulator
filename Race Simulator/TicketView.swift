@@ -96,6 +96,11 @@ struct BetRace: Codable, Identifiable, Hashable {
     let BILGI_EN: String?
     let atlar: [BetHorse]?
 
+    var raceDescription: String {
+        // Example: "SATIŞ 2, 3 Yaşlı İngilizler, 58 Kg"
+        return [CINSDETAY, GRUP, KISALTMA].compactMap { $0 }.joined(separator: ", ")
+    }
+    
     enum CodingKeys: String, CodingKey {
         case KOD, NO, SAAT, MESAFE, PISTKODU, PIST, PIST_EN, KISALTMA, GRUP, GRUP_EN, GRUPKISA, CINSDETAY, CINSDETAY_EN, CINSIYET, ONEMLIADI, ikramiyeler, primler, DOVIZ, BILGI, BILGI_EN, atlar
     }
@@ -273,7 +278,7 @@ struct BetHorse: Codable, Identifiable, Hashable {
         guard let jockey = JOKEYADI else { return "N/A" }
         let components = jockey.split(separator: " ")
         if components.count > 1, let firstInitial = components.first?.first {
-            return "\(firstInitial).\(components.last!)"
+            return "\(firstInitial). \(components.last!)"
         }
         return jockey
     }
@@ -287,19 +292,14 @@ struct TicketView: View {
     @State private var selectedRaceDay: BetRaceDay? {
         didSet {
             if selectedRaceDay?.id != oldValue?.id {
-                selectedBetType = nil
-                selectedRace = nil
-                resetSelections()
+                selectedBetType = ganyanBetTypes.first
             }
         }
     }
     @State private var selectedBetType: BetType? {
         didSet {
             if selectedBetType?.id != oldValue?.id {
-                selectedRace = nil
-                if let newSelectedBetType = selectedBetType, let firstPlayable = filteredRaces(for: selectedRaceDay, betType: newSelectedBetType).first {
-                    selectedRace = firstPlayable
-                }
+                selectedRace = filteredRaces(for: selectedRaceDay, betType: selectedBetType).first
                 resetSelections()
             }
         }
@@ -307,216 +307,227 @@ struct TicketView: View {
     @State private var selectedRace: BetRace?
     @State private var errorMessage: String?
     
-    @State private var selectedHorses: [String: Set<String>] = [:] // [BetRace.KOD: Set<BetHorse.KOD>]
+    @State private var selectedHorses: [String: Set<String>] = [:]
     @State private var multiplier: Int = 1
     
+    // Theme Colors
+    let themePrimary = Color.cyan
+    let themeAccent = Color.orange
+    let themeBackground = Color.black
+    
+    // Computed property for filtered bet types
+    private var ganyanBetTypes: [BetType] {
+        guard let raceDay = selectedRaceDay else { return [] }
+        return raceDay.bahisler.filter { $0.BAHIS.localizedCaseInsensitiveContains("Ganyan") }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            Text("Kupon Oluştur")
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity)
-                .padding(.vertical)
-                .background(.ultraThinMaterial)
-
             if isLoading {
-                ProgressView("Bahis bilgileri yükleniyor...")
+                ProgressView("Bahis bilgileri yükleniyor...").padding()
+                Spacer()
             } else if let errorMessage = errorMessage {
                 ContentUnavailableView("Hata", systemImage: "xmark.octagon", description: Text(errorMessage))
             } else if raceDays.isEmpty {
-                ContentUnavailableView("Yarış Bulunamadı", systemImage: "calendar.badge.exclamationmark", description: Text("Bugün için yerli yarış programı bulunamadı."))
+                ContentUnavailableView("Yarış Bulunamadı", systemImage: "calendar.badge.exclamationmark")
             } else {
-                ScrollView {
-                    VStack(alignment: .center, spacing: 20) {
-                        selectionControlsSection()
-                        
-                        if let raceDay = selectedRaceDay, let betType = selectedBetType {
-                            horseListSection(for: raceDay, betType: betType)
-                        }
-                        
-                        selectedHorsesSection()
-                        
-                        betCalculationSection()
-                    }
-                    .padding()
-                }
+                mainContent()
             }
         }
+        .preferredColorScheme(.dark)
+        .background(themeBackground)
+        .ignoresSafeArea(edges: .bottom)
         .task {
             await loadBettingData()
         }
-    }
-    
-    // MARK: - Section Views
-    
-    @ViewBuilder
-    private func selectionControlsSection() -> some View {
-        
-            VStack {
-                Picker("Şehir Seçin", selection: $selectedRaceDay) {
-                    Text("Lütfen bir şehir seçin").tag(nil as BetRaceDay?)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Hipodrom", selection: $selectedRaceDay) {
                     ForEach(raceDays) { day in
-                        Text("\(day.YER) - \(day.TARIH)").tag(day as BetRaceDay?)
+                        Text("\(day.YER.uppercased()) (\(day.TARIH))")
+                            .tag(day as BetRaceDay?)
                     }
                 }
                 .pickerStyle(.menu)
-                
-                if let selectedRaceDay = selectedRaceDay {
-                    Picker("Bahis Türü Seçin", selection: $selectedBetType) {
-                        Text("Lütfen bir bahis türü seçin").tag(nil as BetType?)
-                        ForEach(selectedRaceDay.bahisler) { bahis in
-                            Text(bahis.BAHIS).tag(bahis as BetType?)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
             }
-        
-
-        if let raceDay = selectedRaceDay, let betType = selectedBetType {
-            raceSelectionBar(for: raceDay, betType: betType)
         }
     }
     
+    // MARK: - UI Components
     @ViewBuilder
-    private func horseListSection(for raceDay: BetRaceDay, betType: BetType) -> some View {
-        
-            let currentFilteredRaces = filteredRaces(for: raceDay, betType: betType)
+    private func mainContent() -> some View {
+        VStack(spacing: 0) {
+            selectionView()
+            raceLegsView()
             
-            if let selectedRace = selectedRace, let horses = selectedRace.atlar {
-                HorseTableView(race: selectedRace, horses: horses, selectedHorses: $selectedHorses, betType: betType)
-            } else if !currentFilteredRaces.isEmpty && selectedRace == nil {
-                ContentUnavailableView("Yarış Seçin", systemImage: "arrow.up.left.circle", description: Text("Lütfen yukarıdan bir yarış seçin."))
+            if selectedRace != nil {
+                raceInfoHeader()
+                ScrollView {
+                    horseListView()
+                }
             } else {
-                ContentUnavailableView("Yarış Yok", systemImage: "calendar.badge.exclamationmark", description: Text("Bu bahis türü için program bulunamadı."))
+                Spacer()
+                ContentUnavailableView("Koşu Seçin", systemImage: "arrow.up", description: Text("Lütfen yukarıdan bir koşu seçin."))
+                
+                Spacer()
             }
+            
+            bettingFooter()
         }
-    
-    @ViewBuilder
-    private func selectedHorsesSection() -> some View {
-        
-            VStack(alignment: .leading, spacing: 15) {
-                if let raceDay = selectedRaceDay, let betType = selectedBetType {
-                    let racesWithSelections = filteredRaces(for: raceDay, betType: betType).filter {
-                        !(selectedHorses[$0.KOD]?.isEmpty ?? true)
-                    }
+    }
 
-                    if racesWithSelections.isEmpty {
-                        Text("Kuponunuza at eklemek için yukarıdaki listeden seçim yapın.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
-                    } else {
-                        ForEach(racesWithSelections) { race in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("\(race.NO). Koşu:")
-                                    .font(.headline.weight(.semibold))
-                                
-                                let columns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
-                                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
-                                    ForEach(Array(selectedHorses[race.KOD]!.sorted()), id: \.self) { horseKod in
-                                        if let horse = race.atlar?.first(where: { $0.KOD == horseKod }) {
-                                            HorseBettingChip(horse: horse) {
-                                                toggleHorseSelection(raceId: race.KOD, horseKod: horse.KOD)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.bottom, 10)
-                        }
-                    }
-                } else {
-                     Text("Kuponunuzu görmek için bir yarış ve bahis türü seçin.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
+    @ViewBuilder
+    private func selectionView() -> some View {
+        Menu {
+            Picker("Bahis Türü", selection: $selectedBetType) {
+                Text("Lütfen Bahis Türü Seçin").tag(nil as BetType?)
+                ForEach(ganyanBetTypes) { type in
+                    Text(type.BAHIS).tag(type as BetType?)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(selectedBetType?.BAHIS ?? "Ganyan Türü Seçin")
+                        .font(.headline)
+                    Text("Ayaklar: \(selectedBetType?.kosular.map(String.init).joined(separator: "-") ?? "...")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemBackground))
         }
-    
+    }
 
     @ViewBuilder
-    private func betCalculationSection() -> some View {
+    private func raceLegsView() -> some View {
         if let raceDay = selectedRaceDay, let betType = selectedBetType {
-            
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Misli:")
-                                .font(.headline)
-                            Stepper(value: $multiplier, in: 1...999) {
-                                Text("\(multiplier)")
-                                    .font(.headline.bold())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(filteredRaces(for: raceDay, betType: betType)) { race in
+                        Button {
+                            selectedRace = race
+                        } label: {
+                            VStack {
+                                Text("\(race.NO). Ayak")
+                                Text("\(selectedHorses[race.KOD]?.count ?? 0)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.black)
+                                    .frame(width: 18, height: 18)
+                                    .background(themeAccent)
+                                    .clipShape(Circle())
                             }
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Toplam Seçim:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(String(format: "%.0f", calculateTotalHorsesBet()))
-                                .font(.title2.bold())
-                                .foregroundColor(.green)
+                            .padding(8)
+                            .frame(minWidth: 40)
+                            .background(selectedRace?.id == race.id ? themePrimary : Color.gray.opacity(0.4))
+                            .foregroundColor(.white)
+                            .cornerRadius(4)
                         }
                     }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .background(Color.gray.opacity(0.2))
+        }
+    }
+
+    @ViewBuilder
+    private func raceInfoHeader() -> some View {
+        if let race = selectedRace {
+            
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("\(race.NO). Koşu")
+                        .font(.subheadline.bold())
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text("Tutar:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%.2f TL", calculateTotalBetAmount(for: raceDay, betType: betType)))
-                            .font(.title.bold())
-                            .foregroundColor(.orange)
-                    }
+                    Label(race.SAAT, systemImage: "clock.fill")
+                        .font(.subheadline.bold())
                 }
-                .padding(.vertical, 5)
+                
+                Text(race.BILGI ?? "")
+                    .font(.subheadline)
+                    .lineLimit(2, reservesSpace: true)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .foregroundColor(.white)
+            .padding(.horizontal)
+            .padding(.vertical, 12)
+            .frame(height: 80, alignment: .top)
+            
         }
-    
-    
-    // MARK: - Helper Functions
-    
-    private func filteredRaces(for raceDay: BetRaceDay?, betType: BetType?) -> [BetRace] {
-        guard let raceDay = raceDay, let betType = betType, let kosular = raceDay.kosular else {
-            return []
-        }
-        
-        let availableRaceNumbersForBetType = Set(betType.kosular.map { String($0) })
-        
-        let racesToDisplay = kosular.filter { race in
-            availableRaceNumbersForBetType.contains(race.NO)
-        }
-        
-        return racesToDisplay.sorted { (Int($0.NO) ?? 0) < (Int($1.NO) ?? 0) }
     }
     
-    private func raceSelectionBar(for raceDay: BetRaceDay, betType: BetType) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(filteredRaces(for: raceDay, betType: betType)) { race in
-                    Button {
-                        selectedRace = race
-                    } label: {
-                        VStack(spacing: 4) {
-                            Text("\(race.NO). Koşu")
-                                .font(.headline.bold())
-                            Text(race.SAAT)
-                                .font(.caption2)
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .background(selectedRace?.id == race.id ? Color.cyan : Color.gray.opacity(0.2))
-                        .foregroundColor(selectedRace?.id == race.id ? .black : .primary)
-                        .cornerRadius(8)
+    @ViewBuilder
+    private func horseListView() -> some View {
+        if let race = selectedRace, let horses = race.atlar {
+            LazyVStack(spacing: 0) {
+                ForEach(horses) { horse in
+                    HorseRow(
+                        horse: horse,
+                        isSelected: selectedHorses[race.KOD]?.contains(horse.KOD) ?? false
+                    ) {
+                        toggleHorseSelection(raceId: race.KOD, horseKod: horse.KOD)
                     }
                 }
             }
-            .padding(.horizontal)
         }
-        .frame(height: 50)
+    }
+
+    @ViewBuilder
+    private func bettingFooter() -> some View {
+        HStack(spacing: 15) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("B: \(calculateBetCombinations())")
+                    .font(.subheadline.bold())
+                Text("T: \(String(format: "%.2f", calculateTotalBetAmount())) ₺")
+                    .font(.subheadline.bold())
+                    .foregroundColor(themeAccent)
+            }
+            
+            Spacer()
+            
+            Text("M:")
+                .font(.subheadline.bold())
+
+            Stepper(value: $multiplier, in: 1...99) {
+                Text("\(multiplier)")
+                    .padding(.horizontal, 10)
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(4)
+            }
+            .labelsHidden()
+            
+            Button {
+                // Kuponu onayla eylemi
+            } label: {
+                Image(systemName: "doc.text.fill")
+                    .font(.title2)
+                    .padding(10)
+                    .background(themePrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .foregroundColor(.primary)
+    }
+
+    // MARK: - Helper Functions
+    private func filteredRaces(for raceDay: BetRaceDay?, betType: BetType?) -> [BetRace] {
+        guard let raceDay, let betType, let kosular = raceDay.kosular else { return [] }
+        let availableRaceNumbers = Set(betType.kosular.map { String($0) })
+        let racesToDisplay = kosular.filter { availableRaceNumbers.contains($0.NO) }
+        return racesToDisplay.sorted { (Int($0.NO) ?? 0) < (Int($1.NO) ?? 0) }
     }
 
     private func loadBettingData() async {
@@ -529,31 +540,18 @@ struct TicketView: View {
             let checksum = checksumResponse.checksum
             
             let betDataUrlString = "https://emedya-cdn.tjk.org/s/d/bet/bet-\(checksum).json"
-            print("➡️ DEBUG: Veri çekiliyor: \(betDataUrlString)")
             let (betData, _) = try await URLSession.shared.data(from: URL(string: betDataUrlString)!)
             
             let decodedResponse = try JSONDecoder().decode(BetDataResponse.self, from: betData)
-
-            let filteredByKOD = decodedResponse.data.yarislar
-                .filter { (Int($0.KOD) ?? 99) < 11 }
-            print("➡️ DEBUG: KOD filtresi sonrası yarış günü sayısı: \(filteredByKOD.count)")
-            if let firstRace = filteredByKOD.first {
-                print("➡️ DEBUG: JSON'dan gelen ilk yarış tarihi: \(firstRace.TARIH)")
-            }
+            let filteredByKOD = decodedResponse.data.yarislar.filter { (Int($0.KOD) ?? 99) < 11 }
             
-            // Tarih filtresi kaldırıldı, artık tüm tarihlerdeki yarışlar listelenecek.
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "dd/MM/yyyy"
             
             let sortedFiltered = filteredByKOD.sorted { raceDay1, raceDay2 in
                 let date1 = dateFormatter.date(from: raceDay1.TARIH) ?? .distantPast
                 let date2 = dateFormatter.date(from: raceDay2.TARIH) ?? .distantPast
-                
-                if date1 != date2 {
-                    return date1 < date2
-                } else {
-                    return raceDay1.YER < raceDay2.YER
-                }
+                return date1 != date2 ? date1 < date2 : raceDay1.YER < raceDay2.YER
             }
 
             await MainActor.run {
@@ -562,16 +560,12 @@ struct TicketView: View {
                 
                 if let firstRaceDay = sortedFiltered.first {
                     self.selectedRaceDay = firstRaceDay
-                    if let firstBetType = firstRaceDay.bahisler.first {
-                        self.selectedBetType = firstBetType
-                        if let firstPlayableRace = filteredRaces(for: firstRaceDay, betType: firstBetType).first {
-                            self.selectedRace = firstPlayableRace
-                        }
+                    self.selectedBetType = ganyanBetTypes.first
+                    if let betType = self.selectedBetType {
+                        self.selectedRace = self.filteredRaces(for: firstRaceDay, betType: betType).first
                     }
                 }
-                print("➡️ DEBUG: Ekrana yüklenecek son yarış günü sayısı: \(self.raceDays.count)")
             }
-            
         } catch {
             print("🔴 DECODE VEYA NETWORK HATASI: \(error)")
             await MainActor.run {
@@ -582,59 +576,57 @@ struct TicketView: View {
     }
     
     private func toggleHorseSelection(raceId: String, horseKod: String) {
-        if selectedBetType?.BAHIS.lowercased().contains("ganyan") == true {
-            if var selections = selectedHorses[raceId] {
-                if selections.contains(horseKod) {
-                    selections.remove(horseKod)
-                } else {
-                    selections.removeAll()
-                    selections.insert(horseKod)
-                }
-                selectedHorses[raceId] = selections
+        // Single horse selection for the exact "Ganyan" bet type.
+        if selectedBetType?.BAHIS == "Ganyan" {
+            var selections = selectedHorses[raceId] ?? []
+            // If the same horse is tapped again, deselect it.
+            if selections.contains(horseKod) {
+                selections.remove(horseKod)
             } else {
-                selectedHorses[raceId] = [horseKod]
+                // For a new selection, clear previous and add the new one.
+                selections.removeAll()
+                selections.insert(horseKod)
             }
+            selectedHorses[raceId] = selections
         } else {
-            if var selections = selectedHorses[raceId] {
-                if selections.contains(horseKod) {
-                    selections.remove(horseKod)
-                } else {
-                    selections.insert(horseKod)
-                }
-                selectedHorses[raceId] = selections
+            // Multiple horse selection for all other bet types (e.g., 6'lı Ganyan).
+            var selections = selectedHorses[raceId] ?? []
+            if selections.contains(horseKod) {
+                selections.remove(horseKod)
             } else {
-                selectedHorses[raceId] = [horseKod]
+                selections.insert(horseKod)
             }
+            selectedHorses[raceId] = selections
         }
     }
     
-    private func calculateTotalHorsesBet() -> Double {
-        var totalSelections = 0
-        if let currentRaceDay = selectedRaceDay, let currentBetType = selectedBetType {
-            for race in filteredRaces(for: currentRaceDay, betType: currentBetType) {
-                totalSelections += selectedHorses[race.KOD]?.count ?? 0
-            }
-        }
-        return Double(totalSelections)
-    }
-    
-    private func calculateTotalBetAmount(for raceDay: BetRaceDay, betType: BetType) -> Double {
-        var productOfSelections = 1
+    private func calculateBetCombinations() -> Int {
+        guard let raceDay = selectedRaceDay, let betType = selectedBetType else { return 0 }
+        
         let filtered = filteredRaces(for: raceDay, betType: betType)
         
-        if betType.BAHIS.lowercased().contains("ganyan") || betType.BAHIS.lowercased().contains("sıralı") || betType.BAHIS.lowercased().contains("plase") {
-            productOfSelections = filtered.reduce(0) { sum, race in
-                sum + (selectedHorses[race.KOD]?.count ?? 0)
-            }
-        } else {
-             productOfSelections = filtered.reduce(1) { product, race in
+        // Multi-leg bets are multiplicative, single-leg bets are additive.
+        if betType.kosular.count > 1 {
+            // Multiplicative logic for bets like 6'lı Ganyan
+            let product = filtered.reduce(1) { result, race in
                 let count = selectedHorses[race.KOD]?.count ?? 0
-                return product * (count > 0 ? count : 1)
+                return result * (count > 0 ? count : 1)
             }
+            
+            // If no horses are selected at all, combinations should be 0.
+            let totalSelections = selectedHorses.values.flatMap { $0 }.count
+            return totalSelections == 0 ? 0 : product
+        } else {
+            // Additive logic for single-leg bets like Ganyan, Plase.
+            return filtered.reduce(0) { $0 + (selectedHorses[$1.KOD]?.count ?? 0) }
         }
-
+    }
+    
+    private func calculateTotalBetAmount() -> Double {
+        guard let betType = selectedBetType else { return 0.0 }
+        let combinations = calculateBetCombinations()
         let poolUnit = Double(betType.POOLUNIT) / 100.0
-        return Double(productOfSelections) * Double(multiplier) * poolUnit
+        return Double(combinations) * Double(multiplier) * poolUnit
     }
     
     private func resetSelections() {
@@ -643,170 +635,115 @@ struct TicketView: View {
     }
 }
 
-// MARK: - Reusable Components
-struct HorseTableView: View {
-    let race: BetRace
-    let horses: [BetHorse]
-    @Binding var selectedHorses: [String: Set<String>]
-    let betType: BetType
-    
-    let headers: [String] = ["No", "Forma", "At İsmi", "Jokey", "AGF"]
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 0) {
-                ForEach(headers.indices, id: \.self) { index in
-                    headerCell(text: headers[index])
-                }
-            }
-            .frame(height: 40)
-            .background(Color(UIColor.secondarySystemBackground))
-            .padding(.horizontal, 8)
-            
-            // Rows
-            ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(horses) { horse in
-                        HorseTableRow(horse: horse, isSelected: isHorseSelected(raceId: race.KOD, horseKod: horse.KOD), betType: betType) {
-                            toggleHorseSelection(raceId: race.KOD, horseKod: horse.KOD)
-                        }
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 20)
-            }
-            .frame(maxHeight: 500) // Avoid taking up too much space
-        }
-    }
-    
-    private func headerCell(text: String) -> some View {
-        Text(text)
-            .font(.caption2.bold())
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .lineLimit(1)
-    }
-    
-    private func isHorseSelected(raceId: String, horseKod: String) -> Bool {
-        selectedHorses[raceId]?.contains(horseKod) ?? false
-    }
-    
-    private func toggleHorseSelection(raceId: String, horseKod: String) {
-        if betType.BAHIS.lowercased().contains("ganyan") {
-            if var selections = selectedHorses[raceId] {
-                if selections.contains(horseKod) {
-                    selections.remove(horseKod)
-                } else {
-                    selections.removeAll()
-                    selections.insert(horseKod)
-                }
-                selectedHorses[raceId] = selections
-            } else {
-                selectedHorses[raceId] = [horseKod]
-            }
-        } else {
-            if var selections = selectedHorses[raceId] {
-                if selections.contains(horseKod) {
-                    selections.remove(horseKod)
-                } else {
-                    selections.insert(horseKod)
-                }
-                selectedHorses[raceId] = selections
-            } else {
-                selectedHorses[raceId] = [horseKod]
-            }
-        }
-    }
-}
-
-struct HorseTableRow: View {
+// MARK: - HorseRow Component
+struct HorseRow: View {
     let horse: BetHorse
     let isSelected: Bool
-    let betType: BetType
     let action: () -> Void
     
+    let themePrimary = Color.cyan
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 0) {
-                // No
-                Text(horse.NO)
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 30, alignment: .leading)
-
-                // Forma
-                AsyncImage(url: URL(string: horse.FORMA ?? "")) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "tshirt.fill").resizable().scaledToFit().padding(8)
-                    }
-                }
-                .frame(width: 30, height: 30)
-                .padding(.horizontal, 5)
+            VStack(spacing: 8) {
                 
-                // At Ismi
-                textCell(horse.AD, alignment: .leading)
+                topSection
                 
-                // Jokey
-                textCell(horse.shortJockeyName, alignment: .leading)
                 
-                // AGF
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(horse.AGF1.map { String(format: "%%%.1f", $0) } ?? "-")
-                    + Text(horse.AGFSIRA1.map { "(\($0))" } ?? "")
-                }
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(horse.AGFSIRA1 == 1 ? .red : .primary)
-                .frame(width: 60, alignment: .leading)
             }
-            .padding(.vertical, 8)
-            .background(horse.KOSMAZ == true ? Color.red.opacity(0.2) : (isSelected ? Color.cyan.opacity(0.3) : Color.clear))
-            .cornerRadius(5)
+            .padding(12)
+            .background(horse.KOSMAZ == true ? Color.red.opacity(0.3) : Color(UIColor.secondarySystemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? themePrimary : Color.clear, lineWidth: 2)
+            )
+            .padding(.horizontal)
+            .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
         .disabled(horse.KOSMAZ == true)
+        .opacity(horse.KOSMAZ == true ? 0.6 : 1.0)
     }
-    
-    @ViewBuilder
-    private func textCell(_ text: String?, alignment: HorizontalAlignment = .center) -> some View {
-        Text(text ?? "N/A")
-            .font(.system(size: 11))
-            .foregroundColor(horse.KOSMAZ == true ? .red : .primary)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
 
-fileprivate struct HorseBettingChip: View {
-    let horse: BetHorse
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Text(horse.NO)
-                    .font(.caption.bold())
-                    .foregroundColor(.white)
-                    .padding(4)
-                    .background(Color.cyan)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-
-                Text(horse.AD)
-                    .font(.caption)
-                    .lineLimit(1)
+    private var topSection: some View{
+        ZStack(alignment: .leading) {
+            
+            GeometryReader { geo in
                 
-                Image(systemName: "xmark.circle.fill")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                if let formaLink = horse.FORMA, let url = URL(string: formaLink) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        }
+                    }
+                    .frame(width: geo.size.width * 0.38, height: 38)
+                    .mask(
+                        LinearGradient(gradient: Gradient(stops: [
+                            .init(color: .black, location: 0.5),
+                            .init(color: .clear, location: 1.0)
+                        ]), startPoint: .leading, endPoint: .trailing)
+                    )
+                    .clipped()
+                }
             }
-            .padding(.vertical, 4)
-            .padding(.horizontal, 6)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            
+            GeometryReader { geo in
+                LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * 0.30)
+            }
+            // İÇERİK
+            HStack(alignment: .center, spacing: 0) {
+                
+                // --- SOL TARAF ---
+                Text(horse.NO)
+                    .font(.system(size: 20, weight: .heavy))
+                    .italic()
+                    .foregroundColor(.white)
+                    .frame(width: 32, alignment: .center)
+                    .minimumScaleFactor(0.6)
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                    .padding(.leading, 6)
+                
+                HStack(spacing: 4) {
+                    Text(horse.AD)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(horse.KOSMAZ == true ? .red : .white)
+                        .strikethrough(horse.KOSMAZ == true, color: .red)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    Text(horse.JOKEYADI ?? "")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    /*
+                    let cleanEkuri = horse.EKURI?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if !cleanEkuri.isEmpty && cleanEkuri != "false" && cleanEkuri != "0" {
+                        AsyncImage(url: URL(string: "https://medya-cdn.tjk.org/imageftp/Img/e\(cleanEkuri).gif")) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFit()
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .frame(width: 16, height: 16)
+                     */
+                    }
+                }
+                .padding(.leading, 4)
+                
+                Spacer(minLength: 10)
+                
         }
-        .buttonStyle(.plain)
+        .frame(height: 38)
+        .clipShape(CustomCorners(corners: [.topLeft, .topRight], radius: 8))
     }
 }
+
 
 #Preview {
     NavigationStack {

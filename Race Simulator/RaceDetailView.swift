@@ -56,7 +56,6 @@ struct RaceDetailView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     
                                     HStack(spacing: 4) {
-                                        // Photo button -> show inline overlay
                                         if let fotoURL = results.FOTOFINISH, !fotoURL.isEmpty {
                                             Button {
                                                 withAnimation { self.showingPhotoURL = fotoURL }
