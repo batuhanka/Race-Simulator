@@ -236,25 +236,14 @@ struct TicketView: View {
         .background(themeBackground)
         .task { await loadBettingData() }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Hipodrom", selection: $selectedRaceDay) {
-                    ForEach(raceDays) { day in
-                        Text("\(day.YER.uppercased()) (\(day.TARIH))").tag(
-                            day as BetRaceDay?
-                        )
-                    }
-                    
-                }
-                .pickerStyle(.menu)
-            }
-        }
     }
 
     @ViewBuilder
     private func mainContent() -> some View {
         VStack(spacing: 0) {
-            selectionView()
+            
+            // ÜST BAŞLIK: Hipodrom/Tarih ve Bahis Türü Yan Yana
+            headerPickersView()
 
             raceLegsView()
 
@@ -285,31 +274,79 @@ struct TicketView: View {
     }
 
     @ViewBuilder
-    private func selectionView() -> some View {
-        Menu {
-            Picker("Bahis Türü", selection: $selectedBetType) {
-                ForEach(ganyanBetTypes) { type in
-                    Text(type.BAHIS).tag(type as BetType?)
+    private func headerPickersView() -> some View {
+        HStack(spacing: 0) {
+            // Hipodrom & Tarih Seçici
+            Menu {
+                Picker("Hipodrom", selection: $selectedRaceDay) {
+                    ForEach(raceDays) { day in
+                        Text("\(day.YER.uppercased()) (\(day.TARIH))").tag(
+                            day as BetRaceDay?
+                        )
+                    }
                 }
-            }
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(selectedBetType?.BAHIS ?? "Ganyan Türü Seçin").font(
-                        .subheadline
-                    )
-                    /*
-                    Text(
-                        "Ayaklar: \(selectedBetType?.kosular.map(String.init).joined(separator: "-") ?? "...")"
-                    ).font(.caption).foregroundColor(.secondary)
-                     */
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("HİPODROM / TARİH")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(themePrimary.opacity(0.8))
+                        Text("\(selectedRaceDay?.YER.uppercased() ?? "Seçiniz") (\(selectedRaceDay?.TARIH ?? "...") )")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
-                Spacer()
-                Image(systemName: "chevron.down").foregroundColor(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            //.background(Color(UIColor.secondarySystemBackground))
+
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 1, height: 25)
+
+            // Bahis Türü Seçici
+            Menu {
+                Picker("Bahis Türü", selection: $selectedBetType) {
+                    ForEach(ganyanBetTypes) { type in
+                        Text(type.BAHIS.uppercased()).tag(type as BetType?)
+                    }
+                }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("BAHİS TÜRÜ")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(themePrimary.opacity(0.8))
+                        Text(selectedBetType?.BAHIS.uppercased() ?? "")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1) // İnce çerçeve
+        )
+        .padding(.horizontal, 8) // Sol-sağ padding, at kartlarıyla hizalı
+        .padding(.top, 8) // Üst boşluk
     }
 
     @ViewBuilder
@@ -364,7 +401,7 @@ struct TicketView: View {
                                     }
                                 }.padding(6)
                             }
-                            .frame(width: 65 , height: 50)
+                            .frame(width: 60, height: 60)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
@@ -399,14 +436,12 @@ struct TicketView: View {
     @ViewBuilder
     private func sideBettingPanel() -> some View {
         VStack(spacing: 12) {
-            // Header
             Label("KUPON", systemImage: "banknotes.fill")
                 .font(.caption.bold())
                 .padding(.top, 10)
             
             Divider()
             
-            // At Seçimleri Listesi
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(getLegSelections(), id: \.self) { legStr in
@@ -425,7 +460,6 @@ struct TicketView: View {
             
             Divider()
 
-            // Misli (Tek Satırda)
             HStack(spacing: 0) {
                 Text("Misli:").font(.system(size: 12, weight: .medium)).foregroundColor(.secondary)
                 Spacer()
@@ -446,7 +480,6 @@ struct TicketView: View {
                 }
             }.padding(.horizontal)
             
-            // Bahis Oranı ve Tutar (Yan yana)
             VStack(spacing: 8) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -466,48 +499,22 @@ struct TicketView: View {
                 }
                 .padding(.horizontal, 8)
             }
-
-            
-            .padding(.horizontal, 8)
             .padding(.bottom, 20)
-            
-            /*
-            Button { /* Onayla */
-            } label: {
-                VStack {
-                    Image(systemName: "checkmark.circle.fill").font(.title3)
-                    Text("ONAYLA").font(.caption2.bold())
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(themePrimary)
-                .foregroundColor(.black)
-                .cornerRadius(12)
-            }
-            .padding(.horizontal, 8)
-             .padding(.bottom, 20)
-             */
         }
     }
 
     // MARK: - Logic Helpers
     
-    /// Kupon panelinde her ayak için seçilen atların numaralarını formatlar (Örn: "1-3-5")
     private func getLegSelections() -> [String] {
         guard let raceDay = selectedRaceDay, let betType = selectedBetType else { return [] }
-        
-        // Bahis türündeki koşu numaralarını sıralı alalım
         let sortedLegRaceNos = betType.kosular.sorted()
 
         return sortedLegRaceNos.compactMap { raceNoInt in
             let raceNoStr = String(raceNoInt)
-            // İlgili koşu objesini bulalım
             guard let race = raceDay.kosular?.first(where: { $0.NO == raceNoStr }) else { return nil }
             let selectedCodes = selectedHorses[race.KOD] ?? []
-            
             if selectedCodes.isEmpty { return "-" }
 
-            // Seçilen atların kodlarını numaralarına (NO) çevirip sıralayalım
             let horseNos = race.atlar?.filter { selectedCodes.contains($0.KOD) }
                 .compactMap { Int($0.NO) }
                 .sorted()
@@ -517,12 +524,8 @@ struct TicketView: View {
         }
     }
 
-    private func filteredRaces(for raceDay: BetRaceDay?, betType: BetType?)
-        -> [BetRace]
-    {
-        guard let raceDay, let betType, let kosular = raceDay.kosular else {
-            return []
-        }
+    private func filteredRaces(for raceDay: BetRaceDay?, betType: BetType?) -> [BetRace] {
+        guard let raceDay, let betType, let kosular = raceDay.kosular else { return [] }
         let availableRaceNumbers = Set(betType.kosular.map { String($0) })
         return kosular.filter { availableRaceNumbers.contains($0.NO) }.sorted {
             (Int($0.NO) ?? 0) < (Int($1.NO) ?? 0)
@@ -531,28 +534,11 @@ struct TicketView: View {
 
     private func loadBettingData() async {
         do {
-            let (cData, _) = try await URLSession.shared.data(
-                from: URL(
-                    string: "https://ebayi.tjk.org/s/d/bet/checksum.json"
-                )!
-            )
-            let checksum = try JSONDecoder().decode(
-                BetChecksumResponse.self,
-                from: cData
-            ).checksum
-            let (bData, _) = try await URLSession.shared.data(
-                from: URL(
-                    string:
-                        "https://emedya-cdn.tjk.org/s/d/bet/bet-\(checksum).json"
-                )!
-            )
-            let decoded = try JSONDecoder().decode(
-                BetDataResponse.self,
-                from: bData
-            )
-            let filtered = decoded.data.yarislar.filter {
-                (Int($0.KOD) ?? 99) < 11
-            }
+            let (cData, _) = try await URLSession.shared.data(from: URL(string: "https://ebayi.tjk.org/s/d/bet/checksum.json")!)
+            let checksum = try JSONDecoder().decode(BetChecksumResponse.self, from: cData).checksum
+            let (bData, _) = try await URLSession.shared.data(from: URL(string: "https://emedya-cdn.tjk.org/s/d/bet/bet-\(checksum).json")!)
+            let decoded = try JSONDecoder().decode(BetDataResponse.self, from: bData)
+            let filtered = decoded.data.yarislar.filter { (Int($0.KOD) ?? 99) < 11 }
 
             await MainActor.run {
                 self.raceDays = filtered
@@ -560,8 +546,7 @@ struct TicketView: View {
                 if let day = filtered.first {
                     self.selectedRaceDay = day
                     self.selectedBetType = ganyanBetTypes.first
-                    self.selectedRace =
-                        filteredRaces(for: day, betType: selectedBetType).first
+                    self.selectedRace = filteredRaces(for: day, betType: selectedBetType).first
                 }
             }
         } catch {
@@ -584,13 +569,10 @@ struct TicketView: View {
     }
 
     private func calculateBetCombinations() -> Int {
-        guard let raceDay = selectedRaceDay, let betType = selectedBetType
-        else { return 0 }
+        guard let raceDay = selectedRaceDay, let betType = selectedBetType else { return 0 }
         let filtered = filteredRaces(for: raceDay, betType: betType)
         if betType.kosular.count > 1 {
-            let product = filtered.reduce(1) {
-                $0 * (max(selectedHorses[$1.KOD]?.count ?? 0, 1))
-            }
+            let product = filtered.reduce(1) { $0 * (max(selectedHorses[$1.KOD]?.count ?? 0, 1)) }
             return selectedHorses.values.flatMap({ $0 }).isEmpty ? 0 : product
         }
         return filtered.reduce(0) { $0 + (selectedHorses[$1.KOD]?.count ?? 0) }
@@ -598,8 +580,7 @@ struct TicketView: View {
 
     private func calculateTotalBetAmount() -> Double {
         guard let betType = selectedBetType else { return 0.0 }
-        return Double(calculateBetCombinations()) * Double(multiplier)
-            * (Double(betType.POOLUNIT) / 100.0)
+        return Double(calculateBetCombinations()) * Double(multiplier) * (Double(betType.POOLUNIT) / 100.0)
     }
 
     private func resetSelections() {
@@ -619,27 +600,18 @@ struct HorseRow: View {
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .leading) {
-
                 GeometryReader { geo in
                     if let forma = horse.FORMA, let url = URL(string: forma) {
                         AsyncImage(url: url) { phase in
                             if let image = phase.image {
-                                image.resizable()
-                                    .aspectRatio(contentMode: .fill)
+                                image.resizable().aspectRatio(contentMode: .fill)
                             }
                         }
-                        .frame(
-                            width: geo.size.width * 0.4,
-                            height: geo.size.height
-                        )
+                        .frame(width: geo.size.width * 0.4, height: geo.size.height)
                         .mask(
                             LinearGradient(
-                                gradient: Gradient(stops: [
-                                    .init(color: .black, location: 0.3),
-                                    .init(color: .clear, location: 1.0),
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
+                                gradient: Gradient(stops: [.init(color: .black, location: 0.3), .init(color: .clear, location: 1.0)]),
+                                startPoint: .leading, endPoint: .trailing
                             )
                         )
                         .opacity(0.6)
@@ -647,49 +619,21 @@ struct HorseRow: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text(horse.NO)
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundColor(.white)
-                        .frame(width: 30)
-                        .shadow(radius: 2)
-
+                    Text(horse.NO).font(.system(size: 16, weight: .heavy)).foregroundColor(.white).frame(width: 30).shadow(radius: 2)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(horse.AD)
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .shadow(radius: 1)
-
-                        Text(horse.JOKEYADI ?? "Jokey Belirtilmemiş")
-                            .font(.system(size: 9))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
+                        Text(horse.AD).font(.system(size: 11, weight: .bold)).foregroundColor(.white).lineLimit(1).shadow(radius: 1)
+                        Text(horse.JOKEYADI ?? "Jokey Belirtilmemiş").font(.system(size: 9)).foregroundColor(.secondary).lineLimit(1)
                     }
-
                     Spacer()
-
                     if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(themePrimary)
-                            .font(.system(size: 16))
+                        Image(systemName: "checkmark.circle.fill").foregroundColor(themePrimary).font(.system(size: 16))
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10).padding(.vertical, 8)
             }
-            .background(
-                isSelected
-                    ? themePrimary.opacity(0.1)
-                    : Color(UIColor.secondarySystemBackground).opacity(0.8)
-            )
+            .background(isSelected ? themePrimary.opacity(0.1) : Color(UIColor.secondarySystemBackground).opacity(0.8))
             .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        isSelected ? themePrimary : Color.clear,
-                        lineWidth: 1
-                    )
-            )
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSelected ? themePrimary : Color.clear, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .disabled(horse.KOSMAZ == true)
@@ -704,16 +648,11 @@ struct Triangle: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         if corner == .bottomLeft {
-            path.move(to: CGPoint(x: 0, y: 0))
-            path.addLine(to: CGPoint(x: 0, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.move(to: CGPoint(x: 0, y: 0)); path.addLine(to: CGPoint(x: 0, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         } else {
-            path.move(to: CGPoint(x: 0, y: 0))
-            path.addLine(to: CGPoint(x: rect.maxX, y: 0))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.move(to: CGPoint(x: 0, y: 0)); path.addLine(to: CGPoint(x: rect.maxX, y: 0)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         }
-        path.closeSubpath()
-        return path
+        path.closeSubpath(); return path
     }
 }
 
