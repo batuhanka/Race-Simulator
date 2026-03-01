@@ -280,7 +280,7 @@ struct TicketView: View {
             Menu {
                 Picker("Hipodrom", selection: $selectedRaceDay) {
                     ForEach(raceDays) { day in
-                        Text("\(day.YER.uppercased()) (\(day.TARIH))").tag(
+                        Text("\(day.YER.uppercased()) \(day.TARIH)").tag(
                             day as BetRaceDay?
                         )
                     }
@@ -289,16 +289,16 @@ struct TicketView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("HİPODROM / TARİH")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundColor(themePrimary.opacity(0.8))
-                        Text("\(selectedRaceDay?.YER.uppercased() ?? "Seçiniz") (\(selectedRaceDay?.TARIH ?? "...") )")
-                            .font(.system(size: 11, weight: .bold))
+                        Text("\(selectedRaceDay?.YER.uppercased() ?? "") \(selectedRaceDay?.TARIH ?? "...")")
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                     }
                     Spacer()
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 12)
@@ -321,17 +321,17 @@ struct TicketView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("BAHİS TÜRÜ")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundColor(themePrimary.opacity(0.8))
                         Text(selectedBetType?.BAHIS.uppercased() ?? "")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             
                     }
                     Spacer()
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 12)
