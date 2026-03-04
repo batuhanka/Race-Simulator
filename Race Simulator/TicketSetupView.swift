@@ -52,7 +52,7 @@ struct TicketSetupView: View {
         NavigationStack {
             ZStack {
                 RadialGradient(colors: [Color(white: 0.15), .black], center: .center, startRadius: 2, endRadius: 700)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.all)
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
@@ -105,18 +105,18 @@ struct TicketSetupView: View {
             .onChange(of: navigateToTicket) { _, isNavigating in
                 if !isNavigating && showAISettings { resetAIState() }
             }
-            
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Tamam") {
-                    isBudgetFocused = false
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Tamam") {
+                        isBudgetFocused = false
+                    }
+                    .foregroundColor(themePrimary)
+                    .fontWeight(.bold)
                 }
-                .foregroundColor(themePrimary)
-                .fontWeight(.bold)
             }
         }
+        
     }
     
     // MARK: - Logic Helpers
