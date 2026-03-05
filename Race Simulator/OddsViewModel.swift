@@ -108,9 +108,84 @@ class OddsViewModel {
             })).sorted()
             if selectedCity == nil || !cities.contains(selectedCity!) { selectedCity = cities.first }
             isLoading = false
-            if selectedCity != nil { fetchRaceDetails() }
+            if let city = selectedCity {
+                await autoSelectUpcomingRun(for: city)
+                fetchRaceDetails()
+            }
         } catch {
             isLoading = false
+        }
+    }
+
+    private func autoSelectUpcomingRun(for _: String) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let now = Date()
+        let calendar = Calendar.current
+
+        // Tüm şehirlerin programını paralel çek
+        let programs: [(city: String, kosular: [Race])] = await withTaskGroup(
+            of: (String, [Race]?).self
+        ) { group in
+            for city in cities {
+                group.addTask {
+                    let program = try? await self.parser.getProgramResponse(date: self.selectedDate, cityName: city)
+                    return (city, program?.kosular)
+                }
+            }
+            var results: [(String, [Race]?)] = []
+            for await result in group { results.append(result) }
+            return results.compactMap { city, kosular in
+                guard let kosular else { return nil }
+                return (city, kosular)
+            }
+        }
+
+        // Gelecekteki en yakın koşu (diff >= 0)
+        var upcomingCity: String? = nil
+        var upcomingRun: Int? = nil
+        var upcomingDiff: TimeInterval = .infinity
+
+        // Hiç gelecek koşu yoksa en son başlayan koşu (diff < 0, max 30dk)
+        var recentCity: String? = nil
+        var recentRun: Int? = nil
+        var recentDiff: TimeInterval = -.infinity
+
+        for (city, kosular) in programs {
+            for kosu in kosular {
+                guard let saat = kosu.SAAT,
+                      let raceNo = Int(kosu.RACENO ?? ""),
+                      let raceTime = formatter.date(from: saat) else { continue }
+
+                let timeComponents = calendar.dateComponents([.hour, .minute], from: raceTime)
+                guard let raceDateTime = calendar.date(
+                    bySettingHour: timeComponents.hour ?? 0,
+                    minute: timeComponents.minute ?? 0,
+                    second: 0,
+                    of: now
+                ) else { continue }
+
+                let diff = raceDateTime.timeIntervalSince(now)
+                guard runsData["\(city)-\(raceNo)"] != nil else { continue }
+
+                if diff >= 0, diff < upcomingDiff {
+                    upcomingDiff = diff
+                    upcomingRun = raceNo
+                    upcomingCity = city
+                } else if diff < 0, diff > -30 * 60, diff > recentDiff {
+                    recentDiff = diff
+                    recentRun = raceNo
+                    recentCity = city
+                }
+            }
+        }
+
+        let finalCity = upcomingCity ?? recentCity
+        let finalRun  = upcomingRun  ?? recentRun
+
+        if let city = finalCity, let run = finalRun {
+            selectedCity = city
+            selectedRun = run
         }
     }
 

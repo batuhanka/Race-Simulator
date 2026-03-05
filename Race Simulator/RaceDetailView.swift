@@ -210,6 +210,7 @@ struct RaceDetailView: View {
             fetchNewCityData(cityName: newValue)
         }
         .onAppear() {
+            selectedIndex = upcomingRaceIndex()
             if kosular.indices.contains(selectedIndex) {
                 checkResults(for: kosular[selectedIndex])
             }
@@ -436,6 +437,43 @@ extension RaceDetailView {
 
 // MARK: - LOGIC & HELPERS
 extension RaceDetailView {
+
+    private func upcomingRaceIndex() -> Int {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        let now = Date()
+        let calendar = Calendar.current
+
+        var upcomingIndex: Int? = nil
+        var upcomingDiff: TimeInterval = .infinity
+        var recentIndex: Int? = nil
+        var recentDiff: TimeInterval = -.infinity
+
+        for (index, kosu) in kosular.enumerated() {
+            guard let saat = kosu.SAAT,
+                  let raceTime = formatter.date(from: saat) else { continue }
+
+            let timeComponents = calendar.dateComponents([.hour, .minute], from: raceTime)
+            guard let raceDateTime = calendar.date(
+                bySettingHour: timeComponents.hour ?? 0,
+                minute: timeComponents.minute ?? 0,
+                second: 0,
+                of: now
+            ) else { continue }
+
+            let diff = raceDateTime.timeIntervalSince(now)
+
+            if diff >= 0, diff < upcomingDiff {
+                upcomingDiff = diff
+                upcomingIndex = index
+            } else if diff < 0, diff > -30 * 60, diff > recentDiff {
+                recentDiff = diff
+                recentIndex = index
+            }
+        }
+
+        return upcomingIndex ?? recentIndex ?? 0
+    }
     
     private func getPistColors(for index: Int) -> [Color] {
         guard kosular.indices.contains(index) else { return [.black, .black] }
