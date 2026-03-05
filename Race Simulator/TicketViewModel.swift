@@ -19,6 +19,7 @@ class TicketViewModel {
     private let initialBet: BetType?
     private let initialDays: [BetRaceDay]?
     private let parser = JsonParser()
+    private var hasLoadedInitially = false
 
     init(initialSelections: [String: Set<String>]? = nil,
          initialDay: BetRaceDay? = nil,
@@ -43,7 +44,7 @@ class TicketViewModel {
     // MARK: - onChange Handlers
 
     func onRaceDayChanged(to newValue: BetRaceDay?) {
-        guard initialSelections == nil else { return }
+        guard hasLoadedInitially else { return }
         if let bahisler = newValue?.bahisler {
             selectedBetType = findPriorityBetType(in: bahisler)
         }
@@ -73,6 +74,7 @@ class TicketViewModel {
             } else {
                 selectedRaceDay = days.first
             }
+            hasLoadedInitially = true
             return
         }
 
@@ -90,6 +92,7 @@ class TicketViewModel {
             } else {
                 selectedRaceDay = filtered.first
             }
+            hasLoadedInitially = true
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false

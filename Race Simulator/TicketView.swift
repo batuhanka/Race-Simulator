@@ -6,9 +6,22 @@ struct TicketView: View {
 
     let themePrimary = Color.cyan
     let themeAccent = Color.orange
-    let themeBackground = Color.black
 
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: TicketViewModel
+
+    private var pistColors: [Color] {
+        let pist = (viewModel.selectedRace?.PIST ?? "").lowercased(with: Locale(identifier: "tr_TR"))
+        if pist.contains("çim") || pist.contains("cim") {
+            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
+        } else if pist.contains("kum") {
+            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
+        } else if pist.contains("sentetik") {
+            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
+        } else {
+            return [Color.gray.opacity(0.3), Color.black.opacity(0.9)]
+        }
+    }
 
     init(initialSelections: [String: Set<String>]? = nil,
          initialDay: BetRaceDay? = nil,
@@ -25,25 +38,77 @@ struct TicketView: View {
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.isLoading {
+                topBar
                 ProgressView("Bahis bilgileri yükleniyor...").padding()
                 Spacer()
             } else if let errorMessage = viewModel.errorMessage {
+                topBar
                 ContentUnavailableView("Hata", systemImage: "xmark.octagon", description: Text(errorMessage))
             } else {
                 mainContent()
             }
         }
         .preferredColorScheme(.dark)
-        .background(themeBackground)
-        .navigationBarTitleDisplayMode(.inline)
+        .background(
+            ZStack {
+                Color.black.ignoresSafeArea()
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        pistColors.last?.opacity(0.45) ?? .black,
+                        Color.black.opacity(0.9)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.6), value: viewModel.selectedRace?.KOD)
+            }
+        )
+        .navigationBarHidden(true)
         .task { await viewModel.loadBettingData() }
         .onChange(of: viewModel.selectedRaceDay) { _, newValue in viewModel.onRaceDayChanged(to: newValue) }
         .onChange(of: viewModel.selectedBetType) { _, newValue in viewModel.onBetTypeChanged(to: newValue) }
     }
 
+    private var topBar: some View {
+        HStack {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            HStack(spacing: 2) {
+                Text("TAY")
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundColor(.white.opacity(0.4))
+                Text("ZEKA")
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundColor(.cyan.opacity(0.9))
+            }
+
+            Spacer()
+
+            Image("tayzekatransparent")
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: 70, height: 70)
+        }
+        .padding(.horizontal)
+        .frame(height: 56)
+    }
+
     @ViewBuilder
     private func mainContent() -> some View {
         VStack(spacing: 0) {
+            topBar
             headerPickersView()
             raceLegsView()
             if let race = viewModel.selectedRace, let info = race.BILGI, !info.isEmpty {
@@ -169,11 +234,13 @@ extension TicketView {
                                 let isCurrentRace = viewModel.selectedRace?.KOD == race.KOD
                                 ZStack {
                                     Triangle(corner: .bottomLeft)
-                                        .fill(isCurrentRace ? themePrimary.opacity(0.4) : Color.gray.opacity(0.2))
+                                        .fill(isCurrentRace
+                                            ? (pistColors.last ?? themePrimary).opacity(0.5)
+                                            : Color.gray.opacity(0.2))
                                     Triangle(corner: .topRight)
                                         .fill(count > 0 ? themeAccent.opacity(0.9) : Color.gray.opacity(0.1))
                                     RoundedRectangle(cornerRadius: 8)
-                                        .stroke(isCurrentRace ? themePrimary : Color.gray.opacity(0.3),
+                                        .stroke(isCurrentRace ? (pistColors.last ?? themePrimary) : Color.gray.opacity(0.3),
                                                 lineWidth: isCurrentRace ? 2 : 1)
                                     VStack {
                                         HStack {
@@ -242,9 +309,10 @@ extension TicketView {
     @ViewBuilder
     private func sideBettingPanel() -> some View {
         VStack(spacing: 12) {
-            Label("KUPON", systemImage: "turkishlirasign.circle.fill")
-                .font(.caption.bold())
+            Text("KUPON")
+                .font(.subheadline.bold())
                 .padding(.top, 10)
+                .foregroundColor(themePrimary)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
@@ -262,39 +330,41 @@ extension TicketView {
                 .padding(.horizontal, 6)
             }
             Divider()
-            HStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 2) {
                 Text("Misli:")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
+                    
                 Spacer()
-                HStack(spacing: 4) {
+                
                     Button { if viewModel.multiplier > 1 { viewModel.multiplier -= 1 } } label: {
                         Image(systemName: "minus.square.fill")
                             .foregroundColor(.secondary)
-                            .font(.system(size: 24))
+                            .font(.system(size: 16))
                     }
                     Text("\(viewModel.multiplier)")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .frame(width: 20)
                     Button { if viewModel.multiplier < 99 { viewModel.multiplier += 1 } } label: {
                         Image(systemName: "plus.square.fill")
                             .foregroundColor(themePrimary)
-                            .font(.system(size: 24))
+                            .font(.system(size: 16))
                     }
-                }
+                
             }
             .padding(.horizontal)
+            
 
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Bahis Oranı").font(.system(size: 10)).foregroundColor(.secondary)
+                    Text("Bahis Oranı").font(.system(size: 14)).foregroundColor(.secondary)
                     Text("\(viewModel.calculateBetCombinations())")
                         .font(.system(size: 16, weight: .bold))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("Tutar").font(.system(size: 10)).foregroundColor(.secondary)
+                    Text("Tutar").font(.system(size: 14)).foregroundColor(.secondary)
                     Text("\(String(format: "%.2f", viewModel.calculateTotalBetAmount())) ₺")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(themeAccent)
