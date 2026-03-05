@@ -20,6 +20,7 @@ class TicketViewModel {
     private let initialDays: [BetRaceDay]?
     private let parser = JsonParser()
     private var hasLoadedInitially = false
+    private var isFirstRaceDayChange = true
 
     init(initialSelections: [String: Set<String>]? = nil,
          initialDay: BetRaceDay? = nil,
@@ -45,9 +46,13 @@ class TicketViewModel {
 
     func onRaceDayChanged(to newValue: BetRaceDay?) {
         guard hasLoadedInitially else { return }
+        let isFirst = isFirstRaceDayChange
+        isFirstRaceDayChange = false
         if let bahisler = newValue?.bahisler {
             selectedBetType = findPriorityBetType(in: bahisler)
         }
+        // On the first onChange after load, preserve AI-generated selections
+        if isFirst && initialSelections != nil { return }
         resetSelections()
     }
 
