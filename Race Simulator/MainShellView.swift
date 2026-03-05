@@ -16,7 +16,7 @@ struct MainShellView: View {
             
             if selectedTab == 3 {
                 NavigationStack {
-                    OddsView(selectedDate: Date())
+                    OddsView(selectedDate: Date(), initialTab: 1)
                 }
             } else if selectedTab == 4 {
                 TicketSetupView()

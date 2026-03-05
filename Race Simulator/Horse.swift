@@ -10,8 +10,7 @@ import Foundation
 import SwiftUI
 
 struct Horse: Identifiable, Codable {
-    var id: String { KOD! }
-    
+    var id: String { KOD ?? UUID().uuidString }
     let KOD: String?
     let KEY: String?
     let NO: String?

@@ -31,10 +31,19 @@ struct RaceDetailView: View {
         f.dateFormat = "yyyyMMdd"
         return f
     }()
-    
+
+    private var turkishDateString: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "tr_TR")
+        f.dateFormat = "d MMMM yyyy EEEE"
+        return f.string(from: selectedDate)
+    }
+
     // MARK: - BODY
     var body: some View {
         VStack(spacing: 0) {
+            citySelectionBar
+            
             headerBilgiAlani
             
             kosuSekmeSecici
@@ -181,11 +190,8 @@ struct RaceDetailView: View {
             }
         )
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                dropdownTitleMenu
-            }
-        }
+        .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .onChange(of: raceName) { _, newValue in
             fetchNewCityData(cityName: newValue)
         }
@@ -300,15 +306,9 @@ extension RaceDetailView {
                     HStack {
                         Text("\(kosu.RACENO ?? "0"). Koşu")
                             .font(.subheadline.bold())
-                        
+
                         Spacer()
-                        
-                        Text(selectedDate.formatted(.dateTime.locale(Locale(identifier: "tr_TR")).month().day().year()))
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        Spacer()
-                        
+
                         Label(kosu.SAAT ?? "00:00", systemImage: "clock.fill")
                             .font(.subheadline.bold())
                     }
@@ -357,32 +357,44 @@ extension RaceDetailView {
         .padding(.vertical, 10)
     }
     
-    private var dropdownTitleMenu: some View {
-        VStack(spacing: 6) {
-            
+    private var citySelectionBar: some View {
+        HStack {
             Menu {
                 ForEach(Array(Set(allRaces)).sorted(), id: \.self) { city in
                     Button {
                         withAnimation { self.raceName = city }
                     } label: {
-                        HStack {
-                            Text(city)
-                            if city == raceName {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+                        Label(
+                            city,
+                            systemImage: city == raceName ? "mappin.circle.fill" : "mappin.circle"
+                        )
                     }
                 }
-            } label:{
-                HStack(spacing: 6) {
-                    Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
-                        .font(.system(size: 18, weight: .bold))
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.cyan)
+                    Text(raceName.turkishCityUppercased)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 12))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.5))
                 }
-                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
             }
+            Spacer()
+            Text(turkishDateString)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.7))
         }
+        .padding(.horizontal)
+        .frame(height: 55)
     }
 }
 

@@ -23,7 +23,7 @@ struct MainView: View {
     private let displayDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "tr_TR")
-        f.dateFormat = "dd MMMM EEEE"
+        f.dateFormat = "dd MMMM yyyy EEEE"
         return f
     }()
     
@@ -56,6 +56,7 @@ struct MainView: View {
                     
                     self.selectedRace = city
                     self.showRaceDetails = true
+                    self.selectedBottomTab = 1
                     self.isGlobalFetching = false
                 }
             } catch {
@@ -176,7 +177,7 @@ struct MainView: View {
             HStack {
                 Button { changeDate(by: -1) } label: {
                     Image(systemName: "chevron.left.circle.fill")
-                        .font(.title2)
+                        .font(.largeTitle)
                         .foregroundColor(.cyan)
                 }
                 .buttonStyle(.plain)
@@ -191,7 +192,7 @@ struct MainView: View {
                 
                 Button { changeDate(by: 1) } label: {
                     Image(systemName: "chevron.right.circle.fill")
-                        .font(.title2)
+                        .font(.largeTitle)
                         .foregroundColor(.cyan)
                 }
                 .buttonStyle(.plain)
@@ -354,6 +355,9 @@ struct MainView: View {
                 let fetched = try await parser.getRaceCities(raceDate: dateString)
                 await MainActor.run {
                     races = fetched
+                    if selectedBottomTab == 1, let firstCity = fetched.first {
+                        fetchDetailsAndNavigate(for: firstCity)
+                    }
                 }
             } catch {
                 print("Veri çekme hatası: \(error)")

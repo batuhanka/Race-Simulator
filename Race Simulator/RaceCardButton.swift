@@ -1,5 +1,36 @@
 import SwiftUI
 
+// MARK: - Turkish City Name Helper
+
+extension String {
+    private static let turkishCityMap: [String: String] = [
+        "sanliurfa":  "ŞANLIURFA",
+        "elazig":     "ELAZIĞ",
+        "izmir":      "İZMİR",
+        "istanbul":   "İSTANBUL",
+        "diyarbakir": "DİYARBAKIR",
+        "kocaeli":    "KOCAELİ",
+        "adana":      "ADANA",
+        "bursa":      "BURSA",
+        "ankara":     "ANKARA",
+        "antalya":    "ANTALYA",
+    ]
+
+    var turkishCityUppercased: String {
+        let key = self.lowercased()
+            .replacingOccurrences(of: "ş", with: "s")
+            .replacingOccurrences(of: "ğ", with: "g")
+            .replacingOccurrences(of: "ı", with: "i")
+            .replacingOccurrences(of: "ö", with: "o")
+            .replacingOccurrences(of: "ü", with: "u")
+            .replacingOccurrences(of: "ç", with: "c")
+            .replacingOccurrences(of: "İ", with: "i")
+            .replacingOccurrences(of: "î", with: "i")
+        return String.turkishCityMap[key]
+            ?? self.uppercased(with: Locale(identifier: "tr_TR"))
+    }
+}
+
 // MARK: - Button Press Effect
 struct CardPressEffectStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -29,10 +60,8 @@ struct RaceCardButton: View {
     
     // MARK: - Otomatik Görsel İsimlendirme
     private func getBackgroundImageName() -> String {
-        // Küçük harfe çevir (Türkçe karakter duyarlı: İ -> i)
         var name = raceName.lowercased(with: Locale(identifier: "tr_TR"))
         
-        // Türkçe karakterleri temizle
         let replacements = [
             "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u", "i̇": "i"
         ]
@@ -53,14 +82,12 @@ struct RaceCardButton: View {
             }
         }) {
             ZStack {
-                // 1. Arka Plan Resmi
                 Image(getBackgroundImageName())
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
                 
-                // 2. Gradyan Katmanı (Yazıların okunması için)
                 LinearGradient(
                     gradient: Gradient(colors: [
                         Color.black.opacity(0.85),
@@ -71,10 +98,9 @@ struct RaceCardButton: View {
                     endPoint: .trailing
                 )
                 
-                // 3. İçerik
                 HStack(spacing: 15) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(raceName.uppercased(with: Locale(identifier: "tr_TR")))
+                        Text(raceName.turkishCityUppercased)
                             .font(.system(size: 22, weight: .black, design: .rounded))
                             .tracking(1)
                         

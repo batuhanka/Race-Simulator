@@ -91,7 +91,7 @@ struct ListItemView: View {
                             if let image = phase.image {
                                 image.resizable().aspectRatio(contentMode: .fill)
                             } else {
-                                Color(at.horseColor).opacity(0.4)
+                                at.coatTheme.bg.opacity(0.4)
                             }
                         }
                         .frame(width: geo.size.width * 0.38, height: 38) // Genişlik %35'e çekildi
