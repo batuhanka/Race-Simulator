@@ -17,14 +17,17 @@ class TicketViewModel {
     private let initialSelections: [String: Set<String>]?
     private let initialDay: BetRaceDay?
     private let initialBet: BetType?
+    private let initialDays: [BetRaceDay]?
     private let parser = JsonParser()
 
     init(initialSelections: [String: Set<String>]? = nil,
          initialDay: BetRaceDay? = nil,
-         initialBet: BetType? = nil) {
+         initialBet: BetType? = nil,
+         initialDays: [BetRaceDay]? = nil) {
         self.initialSelections = initialSelections
         self.initialDay = initialDay
         self.initialBet = initialBet
+        self.initialDays = initialDays
     }
 
     // MARK: - Computed
@@ -58,6 +61,20 @@ class TicketViewModel {
 
     func loadBettingData() async {
         if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" { return }
+
+        // TicketSetupView'dan gelen liste varsa yeniden fetch yapma
+        if let days = initialDays {
+            raceDays = days
+            isLoading = false
+            if let day = initialDay {
+                selectedRaceDay = day
+                selectedBetType = initialBet
+                if let selections = initialSelections { selectedHorses = selections }
+            } else {
+                selectedRaceDay = days.first
+            }
+            return
+        }
 
         do {
             let decoded = try await parser.getBetData()
@@ -160,11 +177,11 @@ class TicketViewModel {
         guard let day else { return "" }
         let formatter = DateFormatter()
         formatter.dateFormat = "dd/MM/yyyy"
-        guard let date = formatter.date(from: day.TARIH) else { return day.YER.uppercased() }
+        guard let date = formatter.date(from: day.TARIH) else { return day.YER.turkishCityUppercased }
         let dayFormatter = DateFormatter()
         dayFormatter.locale = Locale(identifier: "tr_TR")
         dayFormatter.dateFormat = "EEEE"
-        return "\(day.YER.uppercased()) (\(dayFormatter.string(from: date).uppercased()))"
+        return "\(day.YER.turkishCityUppercased) (\(dayFormatter.string(from: date).uppercased()))"
     }
 
     func betTypeLabel(for type: BetType) -> String {

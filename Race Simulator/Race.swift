@@ -31,8 +31,8 @@ struct Race: Decodable, Identifiable {
     let BILGI_EN: String?
     let ENIYIDERECE: String?
     let ENIYIDERECEACIKLAMA: String?
-    let ONEMLIKOSUADI_TR: Bool
-    let ONEMLIKOSUADI_EN: Bool
+    let ONEMLIKOSUADI_TR: String?
+    let ONEMLIKOSUADI_EN: String?
     let OZELADI: Bool
     let APRANTI: Bool
     let SON800: String?
@@ -86,8 +86,16 @@ struct Race: Decodable, Identifiable {
         ENIYIDERECEACIKLAMA = try? container.decodeIfPresent(String.self, forKey: .ENIYIDERECEACIKLAMA)
         
         // Safely decode Bool values (custom handling of String/empty/null cases)
-        ONEMLIKOSUADI_TR = Self.decodeSafeBool(from: container, forKey: .ONEMLIKOSUADI_TR)
-        ONEMLIKOSUADI_EN = Self.decodeSafeBool(from: container, forKey: .ONEMLIKOSUADI_EN)
+        if let str = try? container.decodeIfPresent(String.self, forKey: .ONEMLIKOSUADI_TR), !str.isEmpty {
+            ONEMLIKOSUADI_TR = str
+        } else {
+            ONEMLIKOSUADI_TR = nil
+        }
+        if let str = try? container.decodeIfPresent(String.self, forKey: .ONEMLIKOSUADI_EN), !str.isEmpty {
+            ONEMLIKOSUADI_EN = str
+        } else {
+            ONEMLIKOSUADI_EN = nil
+        }
         OZELADI = Self.decodeSafeBool(from: container, forKey: .OZELADI)
         APRANTI = Self.decodeSafeBool(from: container, forKey: .APRANTI)
         
@@ -141,15 +149,13 @@ struct Race: Decodable, Identifiable {
         self.MESAFE = MESAFE
         self.atlar = atlar
         
-        // Zorunlu Bool alanları varsayılan değerlerle dolduruyoruz
-        self.ONEMLIKOSUADI_TR = false
-        self.ONEMLIKOSUADI_EN = false
+        self.ONEMLIKOSUADI_TR = nil
+        self.ONEMLIKOSUADI_EN = nil
         self.OZELADI = false
         self.APRANTI = false
         self.hasSatisbedeli = false
         self.hasNonRunner = false
-        
-        // Diğer opsiyonelleri nil bırakıyoruz
+
         self.NO = nil; self.TARIH = nil; self.PISTADI_TR = nil; self.PISTADI_EN = nil
         self.ActiveClass = nil; self.KISALTMA = nil; self.GRUP_TR = nil; self.GRUP_EN = nil
         self.GRUPKISA = nil; self.CINSDETAY_TR = nil; self.CINSDETAY_EN = nil; self.CINSIYET = nil

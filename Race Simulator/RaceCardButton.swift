@@ -52,6 +52,7 @@ struct RaceCardButton: View {
     @Binding var havaData: HavaData?
     @Binding var kosular: [Race]
     @Binding var agf: [[String: Any]]
+    @Binding var selectedBottomTab: Int
     
     let parser: JsonParser
     let dateFormatter: DateFormatter
@@ -75,6 +76,7 @@ struct RaceCardButton: View {
     
     var body: some View {
         Button(action: {
+            selectedBottomTab = 1
             if let customAction = action {
                 customAction()
             } else {
@@ -120,7 +122,7 @@ struct RaceCardButton: View {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 6)
+            .shadow(color: .cyan.opacity(0.25), radius: 12, x: 0, y: 4)
         }
         .buttonStyle(CardPressEffectStyle())
         .disabled(isFetching)

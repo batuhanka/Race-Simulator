@@ -43,6 +43,45 @@ struct HavaData {
     
 }
 
+extension HavaData: Decodable {
+    enum CodingKeys: String, CodingKey {
+        case aciklama     = "ACIKLAMA"
+        case cimPistagirligi = "CIMPISTAGIRLIGI"
+        case cimEn        = "CIM_EN"
+        case cimTr        = "CIM_TR"
+        case gece         = "GECE"
+        case havaDurumIcon = "HAVADURUMICON"
+        case havaEn       = "HAVA_EN"
+        case havaTr       = "HAVA_TR"
+        case hipodromAdi  = "HIPODROMADI"
+        case hipodromYeri = "HIPODROMYERI"
+        case kumPistagirligi = "KUMPISTAGIRLIGI"
+        case kumEn        = "KUM_EN"
+        case kumTr        = "KUM_TR"
+        case nem          = "NEM"
+        case sicaklik     = "SICAKLIK"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        aciklama        = (try? c.decodeIfPresent(Int.self,    forKey: .aciklama))        ?? 0
+        cimPistagirligi = (try? c.decodeIfPresent(Int.self,    forKey: .cimPistagirligi)) ?? 0
+        cimEn           = (try? c.decodeIfPresent(String.self, forKey: .cimEn))           ?? ""
+        cimTr           = (try? c.decodeIfPresent(String.self, forKey: .cimTr))           ?? ""
+        gece            = (try? c.decodeIfPresent(Int.self,    forKey: .gece))            ?? 0
+        havaDurumIcon   = (try? c.decodeIfPresent(String.self, forKey: .havaDurumIcon))   ?? ""
+        havaEn          = (try? c.decodeIfPresent(String.self, forKey: .havaEn))          ?? ""
+        havaTr          = (try? c.decodeIfPresent(String.self, forKey: .havaTr))          ?? ""
+        hipodromAdi     = (try? c.decodeIfPresent(String.self, forKey: .hipodromAdi))     ?? ""
+        hipodromYeri    = (try? c.decodeIfPresent(String.self, forKey: .hipodromYeri))    ?? ""
+        kumPistagirligi = (try? c.decodeIfPresent(Int.self,    forKey: .kumPistagirligi)) ?? 0
+        kumEn           = (try? c.decodeIfPresent(String.self, forKey: .kumEn))           ?? ""
+        kumTr           = (try? c.decodeIfPresent(String.self, forKey: .kumTr))           ?? ""
+        nem             = (try? c.decodeIfPresent(Int.self,    forKey: .nem))             ?? 0
+        sicaklik        = (try? c.decodeIfPresent(Int.self,    forKey: .sicaklik))        ?? 0
+    }
+}
+
 extension HavaData {
     init?(from dictionary: [String: Any]) {
         guard let aciklama = dictionary["ACIKLAMA"] as? Int,

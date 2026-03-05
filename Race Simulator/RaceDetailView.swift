@@ -32,6 +32,20 @@ struct RaceDetailView: View {
         return f
     }()
 
+    private var weatherSFSymbol: String {
+        switch havaData.havaDurumIcon {
+        case "icon-w-1":  return "sun.max.fill"
+        case "icon-w-2":  return "cloud.sun.fill"
+        case "icon-w-3":  return "cloud.fill"
+        case "icon-w-4":  return "cloud.rain.fill"
+        case "icon-w-5":  return "cloud.snow.fill"
+        case "icon-w-6":  return "cloud.fog.fill"
+        case "icon-w-7":  return "cloud.bolt.fill"
+        case "icon-w-8":  return "cloud.drizzle.fill"
+        default:          return "cloud.fill"
+        }
+    }
+
     private var turkishDateString: String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "tr_TR")
@@ -313,11 +327,20 @@ extension RaceDetailView {
                             .font(.subheadline.bold())
                     }
                     
-                    Text(kosu.BILGI_TR ?? "")
-                        .font(.subheadline)
-                        .lineLimit(2, reservesSpace: true)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(kosu.BILGI_TR ?? "")
+                            .font(.subheadline.bold())
+                            .lineLimit(1, reservesSpace: true)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                        if let kosuAdi = kosu.ONEMLIKOSUADI_TR {
+                            Text(kosuAdi)
+                                .font(.subheadline.bold())
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                    }
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal)
@@ -365,7 +388,7 @@ extension RaceDetailView {
                         withAnimation { self.raceName = city }
                     } label: {
                         Label(
-                            city,
+                            city.turkishCityUppercased,
                             systemImage: city == raceName ? "mappin.circle.fill" : "mappin.circle"
                         )
                     }
@@ -389,12 +412,25 @@ extension RaceDetailView {
                 .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
             }
             Spacer()
-            Text(turkishDateString)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(turkishDateString)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                HStack(spacing: 5) {
+                    Image(systemName: weatherSFSymbol)
+                        .foregroundColor(.yellow.opacity(0.85))
+                    Text(havaData.havaTr)
+                    Text("·")
+                    Text("\(havaData.sicaklik)°C")
+                    Text("·")
+                    Text("%\(havaData.nem)")
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.55))
+            }
         }
         .padding(.horizontal)
-        .frame(height: 55)
+        .frame(height: 65)
     }
 }
 

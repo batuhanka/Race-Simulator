@@ -29,7 +29,22 @@ struct OddsView: View {
                 dynamicMainList.padding(.horizontal, 8)
             }
         }
-        .background(Color(white: 0.12))
+        .background(
+            ZStack {
+                Color.black.ignoresSafeArea()
+                let colors = pistColors(for: viewModel.selectedRun)
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        colors.last?.opacity(0.5) ?? .black,
+                        Color.black.opacity(0.85)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.6), value: viewModel.selectedRun)
+            }
+        )
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .task {
@@ -70,7 +85,7 @@ extension OddsView {
                         viewModel.fetchRaceDetails()
                     } label: {
                         Label(
-                            city,
+                            city.turkishCityUppercased,
                             systemImage: city == viewModel.selectedCity ? "mappin.circle.fill" : "mappin.circle"
                         )
                     }
@@ -94,13 +109,27 @@ extension OddsView {
                 .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
             }
             Spacer()
-            Text(viewModel.turkishDateString)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white.opacity(0.7))
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(viewModel.turkishDateString)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+                if let hava = viewModel.havaData {
+                    HStack(spacing: 5) {
+                        Image(systemName: weatherSFSymbol)
+                            .foregroundColor(.yellow.opacity(0.85))
+                        Text(hava.havaTr)
+                        Text("·")
+                        Text("\(hava.sicaklik)°C")
+                        Text("·")
+                        Text("%\(hava.nem)")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.55))
+                }
+            }
         }
         .padding(.horizontal)
-        .frame(height: 55)
-        .background(Color(white: 0.12))
+        .frame(height: 65)
     }
 
     private var tabSelectionBar: some View {
@@ -108,7 +137,7 @@ extension OddsView {
             tabButton(title: "Muhtemeller", index: 0)
             tabButton(title: "AGF", index: 1)
         }
-        .background(Color.black)
+        .background(Color.clear)
         .overlay(Divider(), alignment: .bottom)
     }
 
@@ -119,7 +148,7 @@ extension OddsView {
                 .foregroundColor(viewModel.selectedTab == index ? .orange : .gray)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
-                .background(Color(white: 0.12))
+                .background(Color.clear)
                 .overlay(
                     Rectangle()
                         .fill(viewModel.selectedTab == index ? Color.orange : Color.clear)
@@ -128,6 +157,33 @@ extension OddsView {
                 )
         }
         .buttonStyle(.plain)
+    }
+
+    private var weatherSFSymbol: String {
+        switch viewModel.havaData?.havaDurumIcon {
+        case "icon-w-1":  return "sun.max.fill"
+        case "icon-w-2":  return "cloud.sun.fill"
+        case "icon-w-3":  return "cloud.fill"
+        case "icon-w-4":  return "cloud.rain.fill"
+        case "icon-w-5":  return "cloud.snow.fill"
+        case "icon-w-6":  return "cloud.fog.fill"
+        case "icon-w-7":  return "cloud.bolt.fill"
+        case "icon-w-8":  return "cloud.drizzle.fill"
+        default:          return "cloud.fill"
+        }
+    }
+
+    private func pistColors(for run: Int) -> [Color] {
+        let pist = (viewModel.pistPerRun[run] ?? "").lowercased(with: Locale(identifier: "tr_TR"))
+        if pist.contains("cim") || pist.contains("çim") {
+            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
+        } else if pist.contains("kum") {
+            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
+        } else if pist.contains("sentetik") {
+            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
+        } else {
+            return [Color.orange.opacity(0.6), Color.orange]
+        }
     }
 
     private var runSelectionBar: some View {
@@ -140,25 +196,31 @@ extension OddsView {
 
         return HStack(spacing: 4) {
             ForEach(0..<matchingKeys.count, id: \.self) { index in
-                let kosuNo = "\(index + 1)"
+                let run = index + 1
+                let isSelected = viewModel.selectedRun == run
+                let colors = pistColors(for: run)
                 Button {
-                    viewModel.selectedRun = index + 1
+                    viewModel.selectedRun = run
                     viewModel.fetchRaceDetails()
                 } label: {
-                    Text(kosuNo)
+                    Text("\(run)")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(viewModel.selectedRun == (index + 1) ? .black : .white.opacity(0.8))
+                        .foregroundColor(isSelected ? .black : .white.opacity(0.8))
                         .frame(maxWidth: .infinity)
                         .frame(height: 38)
-                        .background(viewModel.selectedRun == (index + 1) ? Color.orange : Color.white.opacity(0.12))
+                        .background(
+                            isSelected
+                            ? LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
+                            : LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.12)], startPoint: .top, endPoint: .bottom)
+                        )
                         .cornerRadius(6)
                 }
                 .buttonStyle(.plain)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.selectedRun)
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
-        .background(Color(white: 0.12))
     }
 
     private var statusInfoBar: some View {
@@ -199,7 +261,7 @@ extension OddsView {
                     }
                 }
                 .frame(height: 35)
-                .background(Color.white)
+                .background(Color.white.opacity(0.9))
                 .overlay(Divider(), alignment: .bottom)
             }
         }
@@ -219,6 +281,7 @@ extension OddsView {
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
             }
             if viewModel.isLoading && !rows.isEmpty {
                 Color.black.opacity(0.2).edgesIgnoringSafeArea(.all)

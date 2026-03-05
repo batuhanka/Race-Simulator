@@ -56,7 +56,6 @@ struct MainView: View {
                     
                     self.selectedRace = city
                     self.showRaceDetails = true
-                    self.selectedBottomTab = 1
                     self.isGlobalFetching = false
                 }
             } catch {
@@ -75,7 +74,7 @@ struct MainView: View {
                 topNavigationBar
                 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 25) {
+                    VStack(spacing: 20) {
                         dynamicRaceProgramSection
                         if !races.isEmpty {
                             simulationCardSection
@@ -85,12 +84,20 @@ struct MainView: View {
                     .padding(.horizontal)
                     .padding(.top, 10)
                 }
+                .background(
+                    RadialGradient(
+                        colors: [Color(white: 0.15), .black],
+                        center: .center,
+                        startRadius: 2,
+                        endRadius: 500
+                    )
+                )
                 
                 
                 
                 
             }
-            .background(Color.black.opacity(0.9))
+            .background(Color.black)
             .onChange(of: selectedBottomTab) { oldValue, newValue in
                 if newValue == 0 {
                     if showRaceDetails {
@@ -98,7 +105,7 @@ struct MainView: View {
                             showRaceDetails = false
                         }
                     }
-                } else if newValue == 1 {
+                } else if newValue == 1, !showRaceDetails {
                     if let firstCity = races.first {
                         fetchDetailsAndNavigate(for: firstCity)
                     }
@@ -146,7 +153,7 @@ struct MainView: View {
             Image("tayzekatransparent")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 60, height: 60)
+                .frame(width: 70, height: 70)
             
             HStack(spacing: 2) {
                 Text("TAY")
@@ -215,7 +222,7 @@ struct MainView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {
-                VStack(spacing: 14) {
+                VStack(spacing: 20) {
                     ForEach(races, id: \.self) { city in
                         RaceCardButton(
                             raceName: city,
@@ -225,6 +232,7 @@ struct MainView: View {
                             havaData: $havaData,
                             kosular: $kosular,
                             agf: $agf,
+                            selectedBottomTab: $selectedBottomTab,
                             parser: parser,
                             dateFormatter: apiDateFormatter
                         )

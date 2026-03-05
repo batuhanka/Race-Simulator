@@ -20,6 +20,8 @@ class OddsViewModel {
     var agfTableRows: [DynamicTableRow] = []
     let agfBahisTurleri: [String] = ["#", "At", "Jokey", "AGF"]
     var raceInfo: String = ""
+    var pistPerRun: [Int: String] = [:]
+    var havaData: HavaData? = nil
 
     private var fetchTask: Task<Void, Never>?
     private var refreshTimer: Timer?
@@ -173,6 +175,14 @@ class OddsViewModel {
             infoStr = [kosu.CINSDETAY_TR, kosu.GRUP_TR, kosu.MESAFE, kosu.PISTADI_TR]
                 .compactMap { $0 }.joined(separator: ", ")
         }
+        if let kosular = decoded.kosular {
+            for kosu in kosular {
+                if let raceNo = Int(kosu.RACENO ?? "") {
+                    pistPerRun[raceNo] = kosu.PIST
+                }
+            }
+        }
+        havaData = decoded.hava
         return (infoStr, decoded)
     }
 

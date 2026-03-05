@@ -25,6 +25,20 @@ struct SimulationSetupView: View {
     @State private var visibleHorseCount: Int = 0
     @State private var revealTask: Task<Void, Never>? = nil
     
+    private var pistColors: [Color] {
+        guard kosular.indices.contains(selectedKosuIndex) else { return [.black, .black] }
+        let pist = (kosular[selectedKosuIndex].PIST ?? "").lowercased(with: Locale(identifier: "tr_TR"))
+        if pist.contains("cim") || pist.contains("çim") {
+            return [Color.green.opacity(0.3), Color.green.opacity(0.9)]
+        } else if pist.contains("kum") {
+            return [Color.brown.opacity(0.3), Color.brown.opacity(0.9)]
+        } else if pist.contains("sentetik") {
+            return [Color.gray.opacity(0.3), Color.gray.opacity(0.9)]
+        } else {
+            return [Color.gray.opacity(0.3), Color.black.opacity(0.9)]
+        }
+    }
+
     let parser = JsonParser()
     private let apiFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -34,39 +48,61 @@ struct SimulationSetupView: View {
     
     
     
+    @Environment(\.dismiss) private var dismiss
+
     // MARK: - TOP BAR
-    private var topNavigationBar: some View {
+    private var topBar: some View {
         HStack {
-            
-            
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
             HStack(spacing: 2) {
                 Text("TAY")
-                    .font(.system(size: 24, weight: .black))
+                    .font(.system(size: 22, weight: .black))
                     .foregroundColor(.white.opacity(0.4))
                 Text("ZEKA")
-                    .font(.system(size: 24, weight: .black))
+                    .font(.system(size: 22, weight: .black))
                     .foregroundColor(.cyan.opacity(0.9))
             }
-            
+
             Spacer()
-            
+
             Image("tayzekatransparent")
                 .resizable()
+                .renderingMode(.original)
                 .scaledToFit()
-                .frame(width: 60, height: 60)
+                .frame(width: 70, height: 70)
         }
         .padding(.horizontal)
-        .frame(height: 60)
-        .background(Color.black)
+        .frame(height: 56)
     }
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
-            VStack(spacing: 20) {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    pistColors.last?.opacity(0.55) ?? .black,
+                    Color.black.opacity(0.85)
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.6), value: selectedKosuIndex)
 
-                
+            VStack(spacing: 20) {
+                topBar
+
                 if isFetching {
                     ProgressView().tint(.cyan).scaleEffect(1.5)
                         .padding(.vertical, 20)
@@ -82,36 +118,11 @@ struct SimulationSetupView: View {
                     startSimulationButton
                         .padding(.top, 10)
                 }
-                
+
                 Spacer()
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 2) {
-                    Text("TAY")
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundColor(.white.opacity(0.4))
-                    Text("ZEKA")
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundColor(.cyan.opacity(0.9))
-                    
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Image("tayzekatransparent")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 40, height: 40)
-            }
-        }
-        .toolbarBackground(Color.black, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationBarHidden(true)
         .onAppear {
             if let city = initialCity ?? availableCities.first {
                 selectedCity = city
@@ -146,7 +157,7 @@ extension SimulationSetupView {
                                     fetchProgram(for: city)
                                 }
                             } label: {
-                                Text(city)
+                                Text(city.turkishCityUppercased)
                                     .font(.system(size: 14, weight: .bold))
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 10)
@@ -182,9 +193,14 @@ extension SimulationSetupView {
                                 }
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
-                                .background(selectedKosuIndex == index ? Color.orange : Color.white.opacity(0.1))
+                                .background(
+                                    selectedKosuIndex == index
+                                    ? LinearGradient(colors: pistColors, startPoint: .top, endPoint: .bottom)
+                                    : LinearGradient(colors: [Color.white.opacity(0.1), Color.white.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                                )
                                 .foregroundColor(selectedKosuIndex == index ? .black : .white)
                                 .cornerRadius(10)
+                                .animation(.easeInOut(duration: 0.2), value: selectedKosuIndex)
                             }
                         }
                     }

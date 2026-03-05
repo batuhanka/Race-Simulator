@@ -63,6 +63,7 @@ struct BahisOran: Codable {
 
 struct ProgramResponse: Decodable {
     let kosular: [Race]?
+    let hava: HavaData?
 }
 
 // MARK: - Table Models

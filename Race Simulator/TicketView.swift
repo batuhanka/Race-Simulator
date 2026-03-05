@@ -12,11 +12,13 @@ struct TicketView: View {
 
     init(initialSelections: [String: Set<String>]? = nil,
          initialDay: BetRaceDay? = nil,
-         initialBet: BetType? = nil) {
+         initialBet: BetType? = nil,
+         initialDays: [BetRaceDay]? = nil) {
         _viewModel = State(initialValue: TicketViewModel(
             initialSelections: initialSelections,
             initialDay: initialDay,
-            initialBet: initialBet
+            initialBet: initialBet,
+            initialDays: initialDays
         ))
     }
 

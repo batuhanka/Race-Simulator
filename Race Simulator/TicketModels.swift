@@ -28,7 +28,7 @@ struct BetType: Codable, Identifiable, Hashable {
 }
 
 struct BetRaceDay: Codable, Identifiable, Hashable {
-    var id: String { KOD }
+    var id: String { KEY }
     let CARDID: String?
     let KOD: String
     let KEY: String
