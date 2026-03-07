@@ -36,7 +36,7 @@ class JsonParser {
     
     
     // MARK: - Muhtemeller (OddsView)
-
+    
     func getMuhtemellerChecksum(date: Date) async throws -> ChecksumResponse {
         let f = DateFormatter(); f.dateFormat = "yyyy/MM/dd"
         guard let url = URL(string: "https://vhs-medya.tjk.org/muhtemeller/s/\(f.string(from: date))/checksum.json") else {
@@ -45,7 +45,7 @@ class JsonParser {
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(ChecksumResponse.self, from: data)
     }
-
+    
     func getMuhtemeller(date: Date, raceKey: String, hash: String) async throws -> RaceDetailResponse {
         let f = DateFormatter(); f.dateFormat = "yyyy/MM/dd"
         guard let url = URL(string: "https://vhs-medya-cdn.tjk.org/muhtemeller/s/\(f.string(from: date))/\(raceKey)-\(hash).json") else {
@@ -54,7 +54,7 @@ class JsonParser {
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(RaceDetailResponse.self, from: data)
     }
-
+    
     func getProgramResponse(date: Date, cityName: String) async throws -> ProgramResponse {
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd"
         guard let url = URL(string: "https://ebayi.tjk.org/s/d/program/\(f.string(from: date))/full/\(cityName).json") else {
@@ -63,9 +63,9 @@ class JsonParser {
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(ProgramResponse.self, from: data)
     }
-
+    
     // MARK: - Betting (TicketView)
-
+    
     func getBetData() async throws -> BetDataResponse {
         guard let checksumURL = URL(string: "https://ebayi.tjk.org/s/d/bet/checksum.json") else {
             throw URLError(.badURL)
@@ -78,9 +78,9 @@ class JsonParser {
         let (bData, _) = try await URLSession.shared.data(from: betURL)
         return try JSONDecoder().decode(BetDataResponse.self, from: bData)
     }
-
+    
     // MARK: - Race Results
-
+    
     func getRaceResult(raceDate: String, cityName: String, targetKod: String) async throws -> RaceResult? {
         // 1. Sanitize the city name (Aynı kalıyor)
         let sanitized = cityName
@@ -92,7 +92,7 @@ class JsonParser {
             .replacingOccurrences(of: "ç", with: "c")
         
         let uppercaseCity = sanitized.uppercased(with: Locale(identifier: "tr_TR"))
-
+        
         let urlString = "https://ebayi.tjk.org/s/d/sonuclar/\(raceDate)/full/\(uppercaseCity).json"
         guard let url = URL(string: urlString) else { return nil }
         
@@ -163,7 +163,7 @@ class JsonParser {
         guard let agfData = checksumData.agf,
               let cityHash = agfData[cityName] else {
             throw NSError(domain: "CityNotFound", code: 404, 
-                         userInfo: [NSLocalizedDescriptionKey: "AGF verisi bulunamadı: \(cityName)"])
+                          userInfo: [NSLocalizedDescriptionKey: "AGF verisi bulunamadı: \(cityName)"])
         }
         
         print("🔑 \(cityName) için AGF hash: \(cityHash)")
@@ -179,7 +179,7 @@ class JsonParser {
         
         guard let jsonObject = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
             throw NSError(domain: "InvalidJSON", code: 1, 
-                         userInfo: [NSLocalizedDescriptionKey: "Geçersiz JSON formatı"])
+                          userInfo: [NSLocalizedDescriptionKey: "Geçersiz JSON formatı"])
         }
         
         print("📦 AGF JSON anahtarları: \(jsonObject.keys)")
@@ -187,38 +187,38 @@ class JsonParser {
         return jsonObject
     }
     
-    /// İzmir için AGF sonuçlarını getirir (kısayol fonksiyon)
-    func getIzmirRaceResults() async throws -> [String: Any] {
-        return try await getCityRaceResults(cityName: "IZMIR")
-    }
     
     /// Belirli bir şehir için gerçek yarış sonuçlarını getirir (AGF değil, koşu sonuçları)
     /// - Parameter cityName: Şehir ismi (örnek: "IZMIR")
     /// - Returns: Sonuç verilerini içeren dictionary
-    func getCityRaceActualResults(cityName: String) async throws -> [String: Any] {
+    func getCityRaceActualResults(cityName: String) async throws -> [[String: Any]] { // Dönüş tipi artık Array
+        
         // 1. Checksum'ı al
         let checksumData = try await getDayChecksum()
         
         // 2. Sonuclar içinden şehir hash'ini al
         guard let sonuclar = checksumData.sonuclar,
-              let cityHash = sonuclar[cityName] else {
-            throw NSError(domain: "CityNotFound", code: 404, 
-                         userInfo: [NSLocalizedDescriptionKey: "Şehir sonuçları bulunamadı: \(cityName)"])
+              let cityHash = sonuclar[cityName]
+        else {
+            throw NSError(domain: "CityNotFound", code: 404,
+                          userInfo: [NSLocalizedDescriptionKey: "Şehir sonuçları bulunamadı: \(cityName)"])
         }
         
-        // 3. Hash ile sonuç JSON'ını çek
+        // 3. URL oluşturma
         guard let url = URL(string: "https://ebayi.tjk.org/s/d/day/sonuclar/\(cityName).json?c=\(cityHash)") else {
             throw URLError(.badURL)
         }
         
         let (data, _) = try await URLSession.shared.data(from: url)
         
-        guard let jsonObject = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
-            throw NSError(domain: "InvalidJSON", code: 1, 
-                         userInfo: [NSLocalizedDescriptionKey: "Geçersiz JSON formatı"])
+        // 4. Casting işlemini [[String: Any]] olarak yapıyoruz
+        guard let jsonArray = try JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]] else {
+            throw NSError(domain: "InvalidJSON", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "JSON formatı Array beklerken farklı geldi."])
         }
         
-        return jsonObject
+        print("Başarıyla \(jsonArray.count) adet sonuç çekildi.")
+        return jsonArray
     }
     
 }

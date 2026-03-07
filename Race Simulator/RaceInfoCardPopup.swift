@@ -10,18 +10,18 @@ struct RaceInfoCardPopup: View {
     let allRaceResults: [RaceResult]
     let allResultsLoaded: Bool
     var previewData: AGFResultData? = nil  // Yalnızca Preview için
-
+    
     @State private var agfResults: AGFResultData?
     @State private var isLoadingResults = false
     @State private var selectedResultType = 1
-
+    
     enum CardPosition { case leading, bottom }
     let position: CardPosition
-
+    
     private var isToday: Bool {
         Calendar.current.isDateInToday(selectedDate)
     }
-
+    
     // MARK: - Body
     var body: some View {
         content
@@ -30,7 +30,7 @@ struct RaceInfoCardPopup: View {
                 if loaded { Task { await loadAGFResults() } }
             }
     }
-
+    
     private var content: some View {
         Group {
             if position == .leading {
@@ -40,7 +40,7 @@ struct RaceInfoCardPopup: View {
             }
         }
     }
-
+    
     // MARK: - Load Results
     private func loadAGFResults() async {
         if let preview = previewData {
@@ -54,29 +54,40 @@ struct RaceInfoCardPopup: View {
         }
         guard !cityName.isEmpty else { return }
         await MainActor.run { isLoadingResults = true }
-
+        
+    
+        
         if isToday {
-            // Bugün: checksum yapısını kullan
             do {
-                let data = try await JsonParser().getCityRaceResults(cityName: cityName)
-                if let agfData = AGFResultData(from: data) {
+                let dataArray = try await JsonParser().getCityRaceActualResults(cityName: cityName)
+                
+                // Yeni init metodunu kullanıyoruz
+                if let agfData = AGFResultData(fromArray: dataArray) {
                     await MainActor.run {
                         self.agfResults = agfData
+                        // Tip seçimi: Eğer 2. Altılı varsa ve 1. boşsa otomatik 2'yi seç
                         if agfData.hasType1 { self.selectedResultType = 1 }
                         else if agfData.hasType2 { self.selectedResultType = 2 }
+                        
                         self.isLoadingResults = false
                     }
-                    return
+                } else {
+                    // Veri boş geldiyse
+                    await MainActor.run {
+                        self.agfResults = nil
+                        self.isLoadingResults = false
+                    }
                 }
-            } catch {}
-            await MainActor.run {
-                self.agfResults = nil
-                self.isLoadingResults = false
+            } catch {
+                print("Bugünkü veri çekilirken hata: \(error)")
+                await MainActor.run {
+                    self.agfResults = nil
+                    self.isLoadingResults = false
+                }
             }
+            return
         } else {
-            // Eski tarihler: tüm sonuçlar yüklenene kadar bekle
             guard allResultsLoaded else {
-                // isLoadingResults = true hâlde bekle, onChange(allResultsLoaded) tetikleyecek
                 return
             }
             let agfData = buildPastDateAGF(from: allRaceResults)
@@ -90,22 +101,21 @@ struct RaceInfoCardPopup: View {
             }
         }
     }
-
+    
     // MARK: - Past Date AGF Builder
     private func buildPastDateAGF(from results: [RaceResult]) -> AGFResultData? {
         guard !results.isEmpty else { return nil }
-
-        // BAHISLER_TR'de "1. 6...GANYAN(...): XXXXTL" formatından son koşuyu ve tutarı bul
+        
         var t1LastRace: Int? = nil
         var t2LastRace: Int? = nil
         var t1Altili: String? = nil
         var t2Altili: String? = nil
-
+        
         for res in results {
             guard let raceNo = Int(res.RACENO ?? ""),
                   let bahis = res.BAHISLER_TR else { continue }
             let lower = bahis.lowercased(with: Locale(identifier: "tr_TR"))
-
+            
             // Numaralı: "1. 6'lı Ganyan" veya "2. 6'lı Ganyan"
             if t1LastRace == nil && lower.contains("1. 6") && lower.contains("ganyan") {
                 t1LastRace = raceNo
@@ -121,21 +131,21 @@ struct RaceInfoCardPopup: View {
                 && (lower.contains("6'l") || lower.contains("6li")) && lower.contains("ganyan") {
                 t1LastRace = raceNo
                 t1Altili = extractAltiliAmount(from: bahis, typePrefix: "6'")
-                    ?? extractAltiliAmount(from: bahis, typePrefix: "6L")
+                ?? extractAltiliAmount(from: bahis, typePrefix: "6L")
             }
         }
-
+        
         // Son koşudan 5 geri giderek başlangıç koşusunu hesapla
         let t1Start = t1LastRace.map { $0 - 5 }
         let t2Start = t2LastRace.map { $0 - 5 }
-
+        
         var type1Winners: [AGFResultData.LegResult] = []
         var type2Winners: [AGFResultData.LegResult] = []
-
+        
         for res in results {
             guard let winner = res.SONUCLAR?.first(where: { $0.SONUC == "1" }),
                   let raceNo = Int(res.RACENO ?? "") else { continue }
-
+            
             if let s1 = t1Start, raceNo >= s1 && raceNo <= s1 + 5 {
                 type1Winners.append(.init(
                     horse: "\(winner.NO ?? "?") - \(winner.AD ?? "Bilinmeyen")",
@@ -151,35 +161,35 @@ struct RaceInfoCardPopup: View {
                 ))
             }
         }
-
+        
         let sortedT1 = type1Winners.sorted { (Int($0.agf) ?? 0) < (Int($1.agf) ?? 0) }
         let sortedT2 = type2Winners.sorted { (Int($0.agf) ?? 0) < (Int($1.agf) ?? 0) }
-
+        
         guard !sortedT1.isEmpty || !sortedT2.isEmpty else { return nil }
-
+        
         return AGFResultData(
             type1Legs: sortedT1,
             type2Legs: sortedT2,
-            tevzi: nil,
+            tevzi1: nil,
+            tevzi2: nil,
             altili1: t1Altili,
             altili2: t2Altili,
             aciklama: nil
         )
     }
-
+    
     private func extractAltiliAmount(from bahislerTR: String, typePrefix: String) -> String? {
         guard let prefixRange = bahislerTR.range(of: typePrefix, options: .caseInsensitive) else { return nil }
         let fromPrefix = String(bahislerTR[prefixRange.lowerBound...])
-
+        
         // At numaralarını içeren parantezi atla: "(...): " sonrasından al
         guard let colonRange = fromPrefix.range(of: "): ") else { return nil }
         let fromColon = String(fromPrefix[colonRange.upperBound...])
-
-        // "XXXXTL" formatından "XXXX" kısmını çıkar
+        
         let amount = fromColon.components(separatedBy: "TL").first?.trimmingCharacters(in: .whitespaces)
         return amount?.isEmpty == false ? amount : nil
     }
-
+    
     // MARK: - Sol Taraf Konumlandırma
     private var leadingPositionCard: some View {
         HStack(spacing: 0) {
@@ -188,7 +198,7 @@ struct RaceInfoCardPopup: View {
                     .frame(width: 350, height: 420)
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
-
+            
             Button {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     isExpanded.toggle()
@@ -212,7 +222,7 @@ struct RaceInfoCardPopup: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
+    
     // MARK: - Alt Taraf Konumlandırma
     private var bottomPositionCard: some View {
         VStack(spacing: 0) {
@@ -236,7 +246,7 @@ struct RaceInfoCardPopup: View {
                     .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: -4)
             }
             .buttonStyle(.plain)
-
+            
             if isExpanded {
                 cardContent
                     .frame(height: 250)
@@ -245,7 +255,7 @@ struct RaceInfoCardPopup: View {
         }
         .frame(maxWidth: .infinity, alignment: .bottom)
     }
-
+    
     // MARK: - Kart İçeriği
     private var cardContent: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -297,7 +307,7 @@ struct RaceInfoCardPopup: View {
         .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 4)
         .padding(8)
     }
-
+    
     // MARK: - AGF Results Section
     @ViewBuilder
     private func agfResultsSection(results: AGFResultData) -> some View {
@@ -311,7 +321,7 @@ struct RaceInfoCardPopup: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
             }
-
+            
             // Tablo
             VStack(spacing: 4) {
                 HStack(spacing: 10) {
@@ -336,11 +346,11 @@ struct RaceInfoCardPopup: View {
                 .padding(.vertical, 6)
                 .background(Color.cyan.opacity(0.25))
                 .cornerRadius(8)
-
+                
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         let legs = selectedResultType == 1 && results.hasType1 ? results.type1Legs : results.type2Legs
-
+                        
                         ForEach(legs.indices, id: \.self) { index in
                             agfResultRow(
                                 //rank: index + 1,
@@ -357,23 +367,106 @@ struct RaceInfoCardPopup: View {
                     }
                 }
                 
-                
-                // Altılı Kazanç (tevzi sadece bugün için gösterilir)
                 let currentAltili = selectedResultType == 1 ? results.altili1 : results.altili2
-                if results.tevzi != nil || currentAltili != nil {
-                    HStack(spacing: 16) {
-                        if let tevzi = results.tevzi {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Tevzi")
-                                    .font(.caption)
+                // Bugünkü veri için modeline eklediğimiz tevzi1/2'yi kullanıyoruz
+                let currentTevzi = selectedResultType == 1 ? results.tevzi1 : results.tevzi2
+                
+                
+                if currentTevzi != nil || currentAltili != nil {
+                    HStack(spacing: 0) {
+                        // --- 1. Tevzi Bölümü ---
+                        if let tevzi = currentTevzi {
+                            HStack(spacing: 10) {
+                                Image(systemName: "banknote.fill")
+                                    .foregroundColor(.green.opacity(0.8))
+                                    .font(.system(size: 14))
+                                
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("TEVZİ")
+                                        .font(.system(size: 9, weight: .black))
+                                        .foregroundColor(.white.opacity(0.4))
+                                    
+                                    Text(tevzi + " ₺")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        
+                        // Eğer her iki veri de varsa araya dikey ince bir çizgi
+                        if currentTevzi != nil && currentAltili != nil {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(width: 1, height: 24)
+                                .padding(.horizontal, 12)
+                        }
+                        
+                        // --- 2. Altılı Bölümü ---
+                        if let altili = currentAltili {
+                            HStack(spacing: 10) {
+                                Image(systemName: "trophy.fill")
+                                    .foregroundColor(.orange.opacity(0.8))
+                                    .font(.system(size: 14))
+                                
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("ALTILI")
+                                        .font(.system(size: 9, weight: .black))
+                                        .foregroundColor(.white.opacity(0.4))
+                                    
+                                    Text(altili + " ₺")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.04))
+                            
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.12), Color.clear],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        }
+                    )
+                    .padding(.horizontal, 0)
+                    .padding(.top, 10)
+                }
+            }
+                
+                /*
+                // Altılı Kazanç ve Tevzi Hesaplama
+                let currentAltili = selectedResultType == 1 ? results.altili1 : results.altili2
+                // Bugünkü veri için modeline eklediğimiz tevzi1/2'yi kullanıyoruz
+                let currentTevzi = selectedResultType == 1 ? results.tevzi1 : results.tevzi2
+                
+                if currentTevzi != nil || currentAltili != nil {
+                    VStack(alignment: .center, spacing: 8) { // Dikeyde sıralıyoruz
+                        
+                        // 1. Tevzi Satırı (Eğer veri varsa)
+                        if let tevzi = currentTevzi {
+                            HStack(spacing: 8) {
+                                Text("Tevzi:")
+                                    .font(.subheadline.bold())
                                     .foregroundColor(.white.opacity(0.6))
-                                Text(tevzi)
+                                Text(tevzi + " ₺")
                                     .font(.subheadline.bold())
                                     .foregroundColor(.green)
                             }
-                            Divider().frame(height: 10)
                         }
-
+                        
+                        // 2. Altılı Kazanç Satırı (Eğer veri varsa)
                         if let altili = currentAltili {
                             HStack(spacing: 8) {
                                 Text("Altılı Kazanç:")
@@ -383,26 +476,25 @@ struct RaceInfoCardPopup: View {
                                     .font(.subheadline.bold())
                                     .foregroundColor(Color.orange)
                             }
-                            .padding(.top, 0)
                         }
-
-                        
                     }
                     .padding(.vertical, 12)
                     .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading) // Sola yaslı durması için
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.cyan.opacity(0.15)))
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 }
-
             }
+            */
             .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        
     }
-
+    
     private func tabButton(type: Int, isSelected: Bool) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -419,7 +511,7 @@ struct RaceInfoCardPopup: View {
         }
         .buttonStyle(.plain)
     }
-
+    
     private func agfResultRow(horseName: String, ganyan: String) -> some View {
         HStack(spacing: 4) {
             //Text("\(rank)")
@@ -428,14 +520,17 @@ struct RaceInfoCardPopup: View {
             //    .frame(width: 35, alignment: .center)
             //    .padding(.vertical, 10)
             Text(horseName)
-                .font(.caption)
+                .font(.footnote.bold())
                 .foregroundColor(.white.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)
             Text(ganyan)
-                .font(.caption.bold())
+                .font(.footnote.bold())
                 .foregroundColor(.green)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .frame(width: 55, alignment: .trailing)
+            
             //Text(agf)
             //    .font(.caption.bold())
             //    .foregroundColor(.orange)
@@ -453,52 +548,76 @@ struct AGFResultData {
         let ganyan: String
         let agf: String
     }
-
+    
     let hasType1: Bool
     let hasType2: Bool
     let type1Legs: [LegResult]
     let type2Legs: [LegResult]
-    let tevzi: String?    // Yalnızca bugün (checksum'dan gelir)
+    let tevzi1: String? // 1. Altılı için Tevzi
+    let tevzi2: String? // 2. Altılı için Tevzi
     let altili1: String?  // 1. Altılı Ganyan tutarı
     let altili2: String?  // 2. Altılı Ganyan tutarı
     let aciklama: String?
-
-    /// Bugün için checksum API'den gelen dictionary'den oluştur
-    init?(from dictionary: [String: Any]) {
+    
+    init?(fromArray array: [[String: Any]]) {
         var t1: [LegResult] = []
         var t2: [LegResult] = []
-
-        let gType = (dictionary["Ganyantipi"] as? Int) ?? Int(dictionary["Ganyantipi"] as? String ?? "0") ?? 0
-
-        for i in 1...6 {
-            if let horse = dictionary["Ayak\(i)"] as? String,
-               let ganyan = dictionary["Ganyan\(i)"] as? String {
-                let res = LegResult(horse: horse, ganyan: ganyan, agf: dictionary["AGF\(i)"] as? String ?? "-")
-                if gType == 1 { t1.append(res) }
-                else if gType == 2 { t2.append(res) }
+        var tvz1: String? = nil
+        var tvz2: String? = nil
+        
+        for dict in array {
+            let rank = dict["rank"] as? Int ?? 0
+            let tevziMiktari = dict["Tevzi"] as? String
+            
+            var legs: [LegResult] = []
+            for i in 1...6 {
+                if let horse = dict["Ayak\(i)"] as? String,
+                   let ganyan = dict["Ganyan\(i)"] as? String {
+                    legs.append(LegResult(horse: horse, ganyan: ganyan, agf: dict["AGF\(i)"] as? String ?? "-"))
+                }
+            }
+            
+            if rank == 1 {
+                t1 = legs
+                tvz1 = tevziMiktari
+            } else if rank == 2 {
+                t2 = legs
+                tvz2 = tevziMiktari
             }
         }
-
+        
+        if t1.isEmpty && t2.isEmpty { return nil }
+        
         self.type1Legs = t1
         self.type2Legs = t2
         self.hasType1 = !t1.isEmpty
         self.hasType2 = !t2.isEmpty
-        self.tevzi = dictionary["Tevzi"] as? String
-        let altiliValue = dictionary["Altili"] as? String
-        self.altili1 = gType != 2 ? altiliValue : nil
-        self.altili2 = gType == 2 ? altiliValue : nil
-        self.aciklama = dictionary["Aciklama"] as? String
-
-        if t1.isEmpty && t2.isEmpty { return nil }
+        self.tevzi1 = tvz1
+        self.tevzi2 = tvz2
+        self.altili1 = nil
+        self.altili2 = nil
+        self.aciklama = nil
     }
-
-    /// Geçmiş tarihler için manuel oluştur
-    init(type1Legs: [LegResult], type2Legs: [LegResult], tevzi: String?, altili1: String?, altili2: String?, aciklama: String?) {
+    
+    
+    init(type1Legs: [LegResult],
+         type2Legs: [LegResult],
+         tevzi1: String?,
+         tevzi2: String?,
+         altili1: String?,
+         altili2: String?,
+         aciklama: String?) {
+        
         self.type1Legs = type1Legs
         self.type2Legs = type2Legs
         self.hasType1 = !type1Legs.isEmpty
         self.hasType2 = !type2Legs.isEmpty
-        self.tevzi = tevzi
+        
+        // Yeni tevzi alanlarını atıyoruz
+        self.tevzi1 = tevzi1
+        self.tevzi2 = tevzi2
+        
+        // Kazanç tutarları
         self.altili1 = altili1
         self.altili2 = altili2
         self.aciklama = aciklama
@@ -524,17 +643,18 @@ struct AGFResultData {
                     .init(horse: "6 - MAGIC BANK", ganyan: "6,45", agf: "3"),
                     .init(horse: "4 - RÜZGARDAHAN", ganyan: "1,60", agf: "4"),
                     .init(horse: "7 - JOLENE", ganyan: "1,30", agf: "5"),
-                    .init(horse: "4 - COOL POWER", ganyan: "9,55", agf: "6")
+                    .init(horse: "4 - COOL POWER", ganyan: "GAYRIRESMI", agf: "6")
                 ],
                 type2Legs: [
-                    .init(horse: "2 - STAR RUNNER", ganyan: "4,20", agf: "1"),
+                    .init(horse: "2 - STAR RUNNER", ganyan: "1,05", agf: "1"),
                     .init(horse: "5 - GOLDEN FLASH", ganyan: "2,75", agf: "2"),
                     .init(horse: "1 - BRAVE HEART", ganyan: "5,10", agf: "3"),
                     .init(horse: "3 - SWIFT ARROW", ganyan: "3,30", agf: "4"),
                     .init(horse: "8 - THUNDER BOLT", ganyan: "7,80", agf: "5"),
                     .init(horse: "6 - STORM KING", ganyan: "2,90", agf: "6")
                 ],
-                tevzi: nil,
+                tevzi1: "16.489.850",  // 1. Altılı Tevzi Örneği
+                tevzi2: "19.170.184",  // 2. Altılı Tevzi Örneği
                 altili1: "29.789,50",
                 altili2: "14.200,00",
                 aciklama: nil
