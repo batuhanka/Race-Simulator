@@ -12,14 +12,93 @@ struct RaceResult: Codable {
     let BAHISLER_TR: String?
     let FOTOFINISH: String?
     let VIDEO: String?
+    let AGF: [String: Any]?  // Altılı Ganyan bilgileri
     
     let atlar: [HorseResult]?
     var SONUCLAR: [HorseResult]? { atlar }
     
     enum CodingKeys: String, CodingKey {
-        case KOD, RACENO, BILGI_TR, TARIH, SAAT, PIST, MESAFE, BAHISLER_TR, FOTOFINISH, VIDEO, atlar
+        case KOD, RACENO, BILGI_TR, TARIH, SAAT, PIST, MESAFE, BAHISLER_TR, FOTOFINISH, VIDEO, AGF, atlar
     }
     
+    // Custom decoder AGF için
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        KOD = try container.decodeIfPresent(String.self, forKey: .KOD)
+        RACENO = try container.decodeIfPresent(String.self, forKey: .RACENO)
+        BILGI_TR = try container.decodeIfPresent(String.self, forKey: .BILGI_TR)
+        TARIH = try container.decodeIfPresent(String.self, forKey: .TARIH)
+        SAAT = try container.decodeIfPresent(String.self, forKey: .SAAT)
+        PIST = try container.decodeIfPresent(String.self, forKey: .PIST)
+        MESAFE = try container.decodeIfPresent(String.self, forKey: .MESAFE)
+        BAHISLER_TR = try container.decodeIfPresent(String.self, forKey: .BAHISLER_TR)
+        FOTOFINISH = try container.decodeIfPresent(String.self, forKey: .FOTOFINISH)
+        VIDEO = try container.decodeIfPresent(String.self, forKey: .VIDEO)
+        atlar = try container.decodeIfPresent([HorseResult].self, forKey: .atlar)
+        
+        // AGF - [String: Any] olduğu için JSONSerialization kullanıyoruz
+        if let agfData = try? container.decode(AGFWrapper.self, forKey: .AGF) {
+            AGF = agfData.dictionary
+        } else {
+            AGF = nil
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(KOD, forKey: .KOD)
+        try container.encodeIfPresent(RACENO, forKey: .RACENO)
+        try container.encodeIfPresent(BILGI_TR, forKey: .BILGI_TR)
+        try container.encodeIfPresent(TARIH, forKey: .TARIH)
+        try container.encodeIfPresent(SAAT, forKey: .SAAT)
+        try container.encodeIfPresent(PIST, forKey: .PIST)
+        try container.encodeIfPresent(MESAFE, forKey: .MESAFE)
+        try container.encodeIfPresent(BAHISLER_TR, forKey: .BAHISLER_TR)
+        try container.encodeIfPresent(FOTOFINISH, forKey: .FOTOFINISH)
+        try container.encodeIfPresent(VIDEO, forKey: .VIDEO)
+        try container.encodeIfPresent(atlar, forKey: .atlar)
+        // AGF encode edilmiyor (gerekirse eklenebilir)
+    }
+}
+
+// AGF için wrapper
+private struct AGFWrapper: Decodable {
+    let dictionary: [String: Any]
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        
+        // JSONDecoder ile decode edilemeyeceği için KeyedDecodingContainer kullanıyoruz
+        let dict = try container.decode([String: AnyCodableValue].self)
+        var result: [String: Any] = [:]
+        
+        for (key, value) in dict {
+            result[key] = value.value
+        }
+        
+        self.dictionary = result
+    }
+}
+
+// Any değerler için wrapper
+private struct AnyCodableValue: Decodable {
+    let value: Any
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        
+        if let intValue = try? container.decode(Int.self) {
+            value = intValue
+        } else if let stringValue = try? container.decode(String.self) {
+            value = stringValue
+        } else if let boolValue = try? container.decode(Bool.self) {
+            value = boolValue
+        } else if let doubleValue = try? container.decode(Double.self) {
+            value = doubleValue
+        } else {
+            value = ""
+        }
+    }
 }
 
 struct HorseResult: Codable, Identifiable {

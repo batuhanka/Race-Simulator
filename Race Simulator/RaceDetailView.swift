@@ -8,6 +8,8 @@ struct RaceDetailView: View {
     @State var kosular: [Race]
     @State var agf: [[String: Any]]
     @State private var currentRaceResult: RaceResult? = nil
+    @State private var allRaceResults: [RaceResult] = []
+    @State private var allResultsFullyLoaded: Bool = false
     
     let allRaces: [String]
     let selectedDate: Date
@@ -24,6 +26,9 @@ struct RaceDetailView: View {
     
     @State private var selectedIndex: Int = 0
     @State private var isRefreshing: Bool = false
+    
+    // Popup kart için state
+    @State private var isCardExpanded: Bool = true
     
     let parser = JsonParser()
     let apiDateFormatter: DateFormatter = {
@@ -55,196 +60,285 @@ struct RaceDetailView: View {
 
     // MARK: - BODY
     var body: some View {
+        mainContent
+            .background(backgroundGradient)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .onChange(of: raceName) { _, newValue in
+                fetchNewCityData(cityName: newValue)
+            }
+            .onAppear(perform: handleOnAppear)
+            .overlay(alignment: .leading, content: popupCardOverlay)
+            .overlay(content: mediaOverlay)
+    }
+    
+    private var mainContent: some View {
         VStack(spacing: 0) {
             citySelectionBar
-            
             headerBilgiAlani
-            
             kosuSekmeSecici
+            contentBody
+        }
+    }
+    
+    @ViewBuilder
+    private var contentBody: some View {
+        if isRefreshing {
+            loadingView
+        } else if kosular.indices.contains(selectedIndex) {
+            raceContentView(for: kosular[selectedIndex])
+        }
+    }
+    
+    @ViewBuilder
+    private func raceContentView(for seciliKosu: Race) -> some View {
+        if let results = currentRaceResult,
+           let finishers = results.SONUCLAR,
+           !finishers.isEmpty,
+           results.KOD == seciliKosu.KOD {
+            resultsView(results: results, finishers: finishers, kod: seciliKosu.KOD)
+        } else if isFetchingResults {
+            loadingView
+        } else {
+            programView(for: seciliKosu)
+        }
+    }
+    
+    private func resultsView(results: RaceResult, finishers: [HorseResult], kod: String) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                resultsHeaderView(results: results)
+                
+                ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
+                    ResultRowView(finisher: finisher)
+                }
+                Color.clear.frame(height: 50)
+            }
+            .padding(.horizontal)
+        }
+        .id("Results_\(kod)")
+    }
+    
+    private func resultsHeaderView(results: RaceResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                if let fotoURL = results.FOTOFINISH, !fotoURL.isEmpty {
+                    photoFinishButton(url: fotoURL)
+                }
+                
+                Spacer()
+                
+                if let videoURL = results.VIDEO, !videoURL.isEmpty {
+                    videoButton(url: videoURL)
+                }
+            }
             
-            if isRefreshing {
-                loadingView
-            } else {
-                if kosular.indices.contains(selectedIndex) {
-                    let seciliKosu = kosular[selectedIndex]
-                    
-                    if let results = currentRaceResult,
-                       let finishers = results.SONUCLAR,
-                       !finishers.isEmpty,
-                       results.KOD == seciliKosu.KOD {
-                        
-                        ScrollView {
-                            LazyVStack(spacing: 4) {
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    
-                                    HStack(spacing: 4) {
-                                        if let fotoURL = results.FOTOFINISH, !fotoURL.isEmpty {
-                                            Button {
-                                                withAnimation { self.showingPhotoURL = fotoURL }
-                                            } label: {
-                                                HStack {
-                                                    Image(systemName: "photo.fill")
-                                                    Text("Foto Finiş")
-                                                        .font(.caption.bold())
-                                                }
-                                                .foregroundColor(.white)
-                                                .frame(maxWidth: .infinity)
-                                                .frame(height: 28)
-                                                .background(Color.blue.opacity(0.6))
-                                                .cornerRadius(16)
-                                            }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        // Video button -> prepare AVPlayer and show inline
-                                        if let videoURL = results.VIDEO, !videoURL.isEmpty {
-                                            Button {
-                                                if let url = URL(string: videoURL) {
-                                                    let player = AVPlayer(url: url)
-                                                    player.play()
-                                                    self.videoPlayer = player
-                                                }
-                                            } label: {
-                                                HStack {
-                                                    Image(systemName: "play.circle.fill")
-                                                    Text("Yarışı İzle")
-                                                        .font(.caption.bold())
-                                                }
-                                                .foregroundColor(.white)
-                                                .frame(maxWidth: .infinity)
-                                                .frame(height: 28)
-                                                .background(Color.orange.opacity(0.6))
-                                                .cornerRadius(16)
-                                            }
-                                        }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(results.BAHISLER_TR ?? "")")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.green)
-                                        .lineLimit(15)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .cornerRadius(2)
-                                .padding(.bottom, 4)
-                                
-                                ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
-                                    ResultRowView(finisher: finisher)
-                                }
-                                Color.clear.frame(height: 50)
-                            }
+            Spacer()
+            
+            Text("\(results.BAHISLER_TR ?? "")")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.green)
+                .lineLimit(15)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cornerRadius(2)
+        .padding(.bottom, 4)
+    }
+    
+    private func photoFinishButton(url: String) -> some View {
+        Button {
+            withAnimation { self.showingPhotoURL = url }
+        } label: {
+            HStack {
+                Image(systemName: "photo.fill")
+                Text("Foto Finiş")
+                    .font(.caption.bold())
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .background(Color.blue.opacity(0.6))
+            .cornerRadius(16)
+        }
+    }
+    
+    private func videoButton(url: String) -> some View {
+        Button {
+            if let videoURL = URL(string: url) {
+                let player = AVPlayer(url: videoURL)
+                player.play()
+                self.videoPlayer = player
+            }
+        } label: {
+            HStack {
+                Image(systemName: "play.circle.fill")
+                Text("Yarışı İzle")
+                    .font(.caption.bold())
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .background(Color.orange.opacity(0.6))
+            .cornerRadius(16)
+        }
+    }
+    
+    private func programView(for seciliKosu: Race) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(seciliKosu.BAHISLER_TR ?? "")")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                        .lineLimit(5)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cornerRadius(2)
+                .padding(.bottom, 4)
+                .padding(.horizontal, 16)
+                
+                if let atlar = seciliKosu.atlar, !atlar.isEmpty {
+                    ForEach(atlar) { at in
+                        ListItemView(at: at)
                             .padding(.horizontal)
-                        }
-                        .id("Results_\(seciliKosu.KOD)")
-                    } else if isFetchingResults {
-                        loadingView
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 4) {
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    
-                                    Text("\(seciliKosu.BAHISLER_TR ?? "")")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.green)
-                                        .lineLimit(5)
-                                    
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .cornerRadius(2)
-                                .padding(.bottom ,4)
-                                .padding(.horizontal, 16)
-                                
-                                if let atlar = seciliKosu.atlar, !atlar.isEmpty {
-                                    ForEach(atlar) { at in
-                                        ListItemView(at: at)
-                                            .padding(.horizontal)
-                                    }
-                                    
-                                    Color.clear.frame(height: 50)
-                                } else {
-                                    ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
-                                }
-                            }
-                        }
-                        .id("ProgramList_\(selectedIndex)")
-                        .transition(.opacity)
                     }
+                    Color.clear.frame(height: 50)
+                } else {
+                    ContentUnavailableView("At Bilgisi Yok", systemImage: "horse.fill")
                 }
             }
         }
-        .background(
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                let pistRenkleri = getPistColors(for: selectedIndex)
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        pistRenkleri.last?.opacity(0.6) ?? .black,
-                        Color.black.opacity(0.8)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.6), value: selectedIndex)
-                
-                RadialGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.4)]),
-                    center: .center,
-                    startRadius: 0,
-                    endRadius: 1000
-                ).ignoresSafeArea()
-            }
-        )
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .onChange(of: raceName) { _, newValue in
-            fetchNewCityData(cityName: newValue)
+        .id("ProgramList_\(selectedIndex)")
+        .transition(.opacity)
+    }
+    
+    private var backgroundGradient: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            pistGradient
+            
+            RadialGradient(
+                gradient: Gradient(colors: [.clear, .black.opacity(0.4)]),
+                center: .center,
+                startRadius: 0,
+                endRadius: 1000
+            )
+            .ignoresSafeArea()
         }
-        .onAppear() {
-            selectedIndex = upcomingRaceIndex()
-            if kosular.indices.contains(selectedIndex) {
-                checkResults(for: kosular[selectedIndex])
-            }
+    }
+    
+    private var pistGradient: some View {
+        let pistRenkleri = getPistColors(for: selectedIndex)
+        return LinearGradient(
+            gradient: Gradient(colors: [
+                pistRenkleri.last?.opacity(0.6) ?? .black,
+                Color.black.opacity(0.8)
+            ]),
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.6), value: selectedIndex)
+    }
+    
+    private func handleOnAppear() {
+        selectedIndex = upcomingRaceIndex()
+        if kosular.indices.contains(selectedIndex) {
+            checkResults(for: kosular[selectedIndex])
         }
         
-        .overlay {
-            Group {
-                if let photo = showingPhotoURL, let url = URL(string: photo) {
-                    modalOverlay(title: "") {
-                        withAnimation { showingPhotoURL = nil }
-                    } content: {
-                        ZoomableRemoteImage(url: url)
-                            .frame(maxWidth: 520, maxHeight: 360)
-                    }
-                } else if let player = videoPlayer {
-                    modalOverlay(title: "") {
-                        player.pause()
-                        withAnimation { videoPlayer = nil }
-                    } content: {
-                        VideoPlayer(player: player)
-                            .frame(maxWidth: 520, maxHeight: 320)
-                            .cornerRadius(12)
-                            .onTapGesture { showVideoFullScreen = true }
-                            .onAppear { player.play() }
-                    }
-                    .fullScreenCover(isPresented: $showVideoFullScreen) {
-                        ZStack {
-                            Color.black.ignoresSafeArea()
-                            VideoPlayer(player: player)
-                                .ignoresSafeArea()
-                                .onAppear { player.play() }
+        // Tüm koşuların sonuçlarını arka planda yükle
+        loadAllRaceResults()
+        
+        // Popup'ı 3 saniye sonra otomatik kapat
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isCardExpanded = false
+            }
+        }
+    }
+    
+    private func loadAllRaceResults() {
+        allResultsFullyLoaded = false
+        Task {
+            let dateStr = apiDateFormatter.string(from: selectedDate)
+            for race in kosular {
+                do {
+                    if let result = try await parser.getRaceResult(raceDate: dateStr, cityName: raceName, targetKod: race.KOD) {
+                        await MainActor.run {
+                            if !allRaceResults.contains(where: { $0.KOD == result.KOD }) {
+                                allRaceResults.append(result)
+                            }
                         }
                     }
+                } catch {
+                    print("⚠️ Koşu \(race.RACENO ?? "?") sonucu alınamadı: \(error)")
                 }
+            }
+            await MainActor.run { allResultsFullyLoaded = true }
+        }
+    }
+    
+    @ViewBuilder
+    private func popupCardOverlay() -> some View {
+        if kosular.indices.contains(selectedIndex) {
+            RaceInfoCardPopup(
+                isExpanded: $isCardExpanded,
+                race: kosular[selectedIndex],
+                havaData: havaData,
+                cityName: raceName,
+                selectedDate: selectedDate,
+                allRaceResults: allRaceResults,
+                allResultsLoaded: allResultsFullyLoaded,
+                position: .leading
+            )
+            .padding(.top, 80)
+            .padding(.bottom, 100)
+            .zIndex(100)
+        }
+    }
+    
+    @ViewBuilder
+    private func mediaOverlay() -> some View {
+        Group {
+            if let photo = showingPhotoURL, let url = URL(string: photo) {
+                photoOverlay(url: url)
+            } else if let player = videoPlayer {
+                videoOverlay(player: player)
+            }
+        }
+    }
+    
+    private func photoOverlay(url: URL) -> some View {
+        modalOverlay(title: "") {
+            withAnimation { showingPhotoURL = nil }
+        } content: {
+            ZoomableRemoteImage(url: url)
+                .frame(maxWidth: 520, maxHeight: 360)
+        }
+    }
+    
+    private func videoOverlay(player: AVPlayer) -> some View {
+        modalOverlay(title: "") {
+            player.pause()
+            withAnimation { videoPlayer = nil }
+        } content: {
+            VideoPlayer(player: player)
+                .frame(maxWidth: 520, maxHeight: 320)
+                .cornerRadius(12)
+                .onTapGesture { showVideoFullScreen = true }
+                .onAppear { player.play() }
+        }
+        .fullScreenCover(isPresented: $showVideoFullScreen) {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                VideoPlayer(player: player)
+                    .ignoresSafeArea()
+                    .onAppear { player.play() }
             }
         }
     }
@@ -506,7 +600,12 @@ extension RaceDetailView {
                 
                 await MainActor.run {
                     self.currentRaceResult = result
-                    self.isFetchingResults = false // Yükleme bitti
+                    self.isFetchingResults = false
+                    
+                    // Sonucu allRaceResults'a ekle (yalnızca bir kez)
+                    if let result = result, !allRaceResults.contains(where: { $0.KOD == result.KOD }) {
+                        allRaceResults.append(result)
+                    }
                 }
             } catch {
                 await MainActor.run { self.isFetchingResults = false }
@@ -518,30 +617,32 @@ extension RaceDetailView {
         isRefreshing = true
         selectedIndex = 0
         currentRaceResult = nil
+        allRaceResults = []
+        allResultsFullyLoaded = false
         Task {
             do {
                 let dateStr = apiDateFormatter.string(from: selectedDate)
                 let program = try await parser.getProgramData(raceDate: dateStr, cityName: cityName)
-                
+
                 var newHava: HavaData?
                 if let havaDict = program["hava"] as? [String: Any] { newHava = HavaData(from: havaDict) }
-                
+
                 var newKosular: [Race] = []
                 if let kosularArray = program["kosular"] as? [[String: Any]] {
                     let data = try JSONSerialization.data(withJSONObject: kosularArray)
                     newKosular = try JSONDecoder().decode([Race].self, from: data)
                 }
-                
+
                 let newAgf = program["agf"] as? [[String: Any]] ?? []
-                
+
                 await MainActor.run {
                     if let safeHava = newHava { self.havaData = safeHava }
                     self.kosular = newKosular
                     self.agf = newAgf
                     withAnimation { isRefreshing = false }
-                    // Trigger check for first race of new city
                     if !newKosular.isEmpty { checkResults(for: newKosular[0]) }
                 }
+                loadAllRaceResults()
             } catch {
                 await MainActor.run { isRefreshing = false }
             }
