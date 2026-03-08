@@ -3,8 +3,86 @@ import SwiftUI
 struct ResultRowView: View {
     let finisher: HorseResult
     
+    /// Sola kaydırma ile açılan aksiyon butonu için callback.
+    /// Parametre olarak atın kodunu (KOD) alır.
+    /// `nil` ise swipe devre dışı.
+    var onSwipeAction: ((String) -> Void)? = nil
+    
+    @State private var dragOffset: CGFloat = 0
+    
+    private let actionButtonWidth: CGFloat = 76
+    
+    // MARK: - Swipe Action Button
+    private var swipeActionButton: some View {
+        Button {
+            if let kod = finisher.KOD {
+                onSwipeAction?(kod)
+            }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                dragOffset = 0
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                Text("ANALİZ")
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(0.5)
+            }
+            .foregroundColor(.white)
+            .frame(width: actionButtonWidth)
+            .frame(maxHeight: .infinity)
+            .background(
+                LinearGradient(
+                    colors: [Color.cyan.opacity(0.85), Color.blue],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .clipShape(CustomCorners(corners: [.topRight, .bottomRight], radius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Drag Gesture
+    private var swipeDragGesture: some Gesture {
+        DragGesture(minimumDistance: 15, coordinateSpace: .local)
+            .onChanged { value in
+                guard onSwipeAction != nil else { return }
+                let tx = value.translation.width
+                if tx < 0 {
+                    // Sola kayma: buton genişliği kadar sınırla
+                    dragOffset = max(tx, -actionButtonWidth)
+                } else if dragOffset < 0 {
+                    // Geri kaydırma
+                    dragOffset = min(0, dragOffset + tx)
+                }
+            }
+            .onEnded { value in
+                guard onSwipeAction != nil else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    if -dragOffset > actionButtonWidth * 0.45 {
+                        dragOffset = -actionButtonWidth
+                    } else {
+                        dragOffset = 0
+                    }
+                }
+            }
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .trailing) {
+            
+            // Swipe butonu: kartın arkasında, sağa yaslanmış.
+            // Kart sola kaydıkça ortaya çıkar.
+            if onSwipeAction != nil {
+                swipeActionButton
+            }
+            
+            // ==========================================
+            // KART İÇERİĞİ
+            // ==========================================
+            VStack(spacing: 0) {
             
             // ==========================================
             // 1. ÜST KISIM (HEADER)
@@ -181,6 +259,10 @@ struct ResultRowView: View {
             
         }
         .opacity(finisher.KOSMAZ == true ? 0.5 : 1.0)
+        .offset(x: dragOffset)
+        .gesture(swipeDragGesture)
+        
+        } // ZStack sonu
         .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 2)
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
@@ -192,46 +274,61 @@ struct ResultRowView: View {
     ScrollView {
         VStack(spacing: 4) {
             // 1. Örnek: Kazanan (Ganyan ve Fark belirgin)
-            ResultRowView(finisher: .mock(
-                no: "3",
-                sonuc: "1", // Sonuç sırasını ekliyoruz
-                ad: "GÜLŞAH SULTAN",
-                jokey: "G.KOCAKAYA",
-                derece: "1.24.45",
-                ganyan: "2.45",
-                kilo: 58,
-                start: "5",
-                fark: "2 Boy",
-                taki: "KG DB SK"
-            ))
+            ResultRowView(
+                finisher: .mock(
+                    no: "3",
+                    sonuc: "1",
+                    ad: "GÜLŞAH SULTAN",
+                    jokey: "G.KOCAKAYA",
+                    derece: "1.24.45",
+                    ganyan: "2.45",
+                    kilo: 58,
+                    start: "5",
+                    fark: "2 Boy",
+                    taki: "KG DB SK"
+                ),
+                onSwipeAction: { atKodu in
+                    print("ANALİZ tapped - At Kodu: \(atKodu)")
+                }
+            )
             
             // 2. Örnek: Plase (Yakın ara bitiriş)
-            ResultRowView(finisher: .mock(
-                no: "1",
-                sonuc: "2",
-                ad: "DEMİR KIRBAÇ",
-                jokey: "H.KARATAŞ",
-                derece: "1.24.80",
-                ganyan: "4.15",
-                kilo: 56.5,
-                start: "1",
-                fark: "Burun",
-                taki: "K"
-            ))
+            ResultRowView(
+                finisher: .mock(
+                    no: "1",
+                    sonuc: "2",
+                    ad: "DEMİR KIRBAÇ",
+                    jokey: "H.KARATAŞ",
+                    derece: "1.24.80",
+                    ganyan: "4.15",
+                    kilo: 56.5,
+                    start: "1",
+                    fark: "Burun",
+                    taki: "K"
+                ),
+                onSwipeAction: { atKodu in
+                    print("ANALİZ tapped - At Kodu: \(atKodu)")
+                }
+            )
             
             // 3. Örnek: Derecesiz/Düşük Ganyanlı
-            ResultRowView(finisher: .mock(
-                no: "12",
-                sonuc: "3",
-                ad: "RÜZGARIN OĞLU",
-                jokey: "M.KAYA",
-                derece: "1.26.12",
-                ganyan: "15.20",
-                kilo: 54,
-                start: "10",
-                fark: "Uzak",
-                taki: "DB"
-            ))
+            ResultRowView(
+                finisher: .mock(
+                    no: "12",
+                    sonuc: "3",
+                    ad: "RÜZGARIN OĞLU",
+                    jokey: "M.KAYA",
+                    derece: "1.26.12",
+                    ganyan: "15.20",
+                    kilo: 54,
+                    start: "10",
+                    fark: "Uzak",
+                    taki: "DB"
+                ),
+                onSwipeAction: { atKodu in
+                    print("ANALİZ tapped - At Kodu: \(atKodu)")
+                }
+            )
         }
         .padding()
     }
@@ -241,8 +338,9 @@ struct ResultRowView: View {
 // MARK: - Mock Helper
 extension HorseResult {
     static func mock(
+        kod: String = "12345",
         no: String = "1",
-        sonuc: String = "1", // Mock verisine `sonuc` eklendi
+        sonuc: String = "1",
         ad: String = "HORSE NAME",
         jokey: String = "JOCKEY",
         derece: String = "1",
@@ -253,11 +351,12 @@ extension HorseResult {
         taki: String = "TAKİ"
     ) -> HorseResult {
         HorseResult(
+            KOD: kod,
             KEY: UUID().uuidString,
             AD: ad,
             NO: no,
             JOKEYADI: jokey,
-            SONUC: sonuc, // `SONUC` parametresi atandı
+            SONUC: sonuc,
             YAS: "4y d a",
             DERECE: derece,
             GANYAN: ganyan,

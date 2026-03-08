@@ -41,8 +41,9 @@ private func parseSonYaris(_ veri: String) -> some View {
 struct ListItemView: View {
     let at: Horse
     /// Sola kaydırma ile açılan aksiyon butonu için callback.
+    /// Parametre olarak atın kodunu (KOD) alır.
     /// `nil` ise swipe devre dışı.
-    var onSwipeAction: (() -> Void)? = nil
+    var onSwipeAction: ((String) -> Void)? = nil
 
     @State private var dragOffset: CGFloat = 0
 
@@ -81,7 +82,9 @@ struct ListItemView: View {
     // MARK: - Swipe Action Button
     private var swipeActionButton: some View {
         Button {
-            onSwipeAction?()
+            if let kod = at.KOD {
+                onSwipeAction?(kod)
+            }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                 dragOffset = 0
             }
@@ -103,7 +106,6 @@ struct ListItemView: View {
                     endPoint: .bottom
                 )
             )
-            // Sadece sağ köşeler yuvarlanır — kartın sağ kenarına yapışık dikdörtgen görünüm
             .clipShape(CustomCorners(corners: [.topRight, .bottomRight], radius: 8))
         }
         .buttonStyle(.plain)
@@ -358,7 +360,9 @@ struct CustomCorners: Shape {
 
     ZStack {
         Color(.systemGroupedBackground).ignoresSafeArea()
-        ListItemView(at: ornekAt, onSwipeAction: { print("ANALİZ tapped") })
+        ListItemView(at: ornekAt, onSwipeAction: { atKodu in 
+            print("ANALİZ tapped - At Kodu: \(atKodu)")
+        })
             .padding()
     }
 }

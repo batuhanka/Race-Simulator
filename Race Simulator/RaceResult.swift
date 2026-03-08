@@ -12,7 +12,7 @@ struct RaceResult: Codable {
     let BAHISLER_TR: String?
     let FOTOFINISH: String?
     let VIDEO: String?
-    let AGF: [String: Any]?  // Altılı Ganyan bilgileri
+    let AGF: [String: Any]?
     
     let atlar: [HorseResult]?
     var SONUCLAR: [HorseResult]? { atlar }
@@ -104,6 +104,7 @@ private struct AnyCodableValue: Decodable {
 struct HorseResult: Codable, Identifiable {
     var id: String { KEY ?? UUID().uuidString }
     
+    let KOD: String?
     let KEY: String?
     let AD: String?
     let NO: String?
@@ -169,10 +170,11 @@ struct HorseResult: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case KEY, AD, NO, JOKEYADI, YAS, SONUC, DERECE, GANYAN, FARK, KILO, START, ANTRENORADI, SAHIPADI, FORMA, TAKI, KOSMAZ, APRANTIFLG, EKURI
+        case KOD, KEY, AD, NO, JOKEYADI, YAS, SONUC, DERECE, GANYAN, FARK, KILO, START, ANTRENORADI, SAHIPADI, FORMA, TAKI, KOSMAZ, APRANTIFLG, EKURI
     }
 
     init(
+        KOD: String?,
         KEY: String?,
         AD: String?,
         NO: String?,
@@ -192,6 +194,7 @@ struct HorseResult: Codable, Identifiable {
         APRANTIFLG: Bool?,
         EKURI: String?
     ) {
+        self.KOD = KOD
         self.KEY = KEY
         self.AD = AD
         self.NO = NO
@@ -214,6 +217,7 @@ struct HorseResult: Codable, Identifiable {
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        KOD = try container.decodeIfPresent(String.self, forKey: .KOD)
         KEY = try container.decodeIfPresent(String.self, forKey: .KEY)
         AD = try container.decodeIfPresent(String.self, forKey: .AD)
         NO = try container.decodeIfPresent(String.self, forKey: .NO)
@@ -246,6 +250,7 @@ struct HorseResult: Codable, Identifiable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(KOD, forKey: .KOD)
         try container.encodeIfPresent(KEY, forKey: .KEY)
         try container.encodeIfPresent(AD, forKey: .AD)
         try container.encodeIfPresent(NO, forKey: .NO)

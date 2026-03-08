@@ -23,23 +23,54 @@ class HtmlParser {
     // MARK: - Fetch HTML
     /// URL'den HTML içeriğini çeker
     func fetchHTML(from urlString: String) async throws -> String {
+        print("🌐 [fetchHTML] URL: \(urlString)")
+        
         guard let url = URL(string: urlString) else {
+            print("🌐 [fetchHTML] ❌ Geçersiz URL")
             throw HtmlParserError.invalidURL
         }
         
+        print("🌐 [fetchHTML] URLSession başlatılıyor...")
         let (data, response) = try await URLSession.shared.data(from: url)
+        print("🌐 [fetchHTML] ✅ Veri alındı - Boyut: \(data.count) bytes")
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("🌐 [fetchHTML] ❌ HTTP Response değil")
+            throw HtmlParserError.invalidResponse
+        }
+        
+        print("🌐 [fetchHTML] HTTP Status Code: \(httpResponse.statusCode)")
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("🌐 [fetchHTML] ❌ Başarısız status code")
             throw HtmlParserError.invalidResponse
         }
         
         // Türkçe karakterler için encoding
-        guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+        var html: String?
+        
+        // Önce UTF-8 dene
+        if let utf8String = String(data: data, encoding: .utf8) {
+            html = utf8String
+            print("🌐 [fetchHTML] ✅ UTF-8 encoding kullanıldı")
+        } else if let isoString = String(data: data, encoding: .isoLatin1) {
+            html = isoString
+            print("🌐 [fetchHTML] ✅ ISO Latin1 encoding kullanıldı")
+        } else if let windowsString = String(data: data, encoding: .windowsCP1254) {
+            html = windowsString
+            print("🌐 [fetchHTML] ✅ Windows CP1254 encoding kullanıldı")
+        } else {
+            print("🌐 [fetchHTML] ❌ Hiçbir encoding çalışmadı")
             throw HtmlParserError.decodingFailed
         }
         
-        return html
+        guard let finalHtml = html else {
+            print("🌐 [fetchHTML] ❌ HTML decode edilemedi")
+            throw HtmlParserError.decodingFailed
+        }
+        
+        print("🌐 [fetchHTML] ✅ HTML decode başarılı - Uzunluk: \(finalHtml.count) karakter")
+        return finalHtml
     }
     
     // MARK: - Generic Parsing Functions
@@ -194,23 +225,71 @@ extension HtmlParser {
     func parseAtKosuBilgileri(atId: String) async throws -> HorseDetailInfo {
         let urlString = "https://www.tjk.org/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri?1=1&QueryParameter_AtId=\(atId)"
         
+        print("🐴 [DEBUG] Fetching URL: \(urlString)")
+        
         let html = try await fetchHTML(from: urlString)
+        print("🐴 [DEBUG] HTML uzunluğu: \(html.count) karakter")
+        print("🐴 [DEBUG] İlk 500 karakter: \(String(html.prefix(500)))")
         
         // Künye container'ı bul
         guard let kunyeContainer = extractKunyeContainer(from: html) else {
+            print("🐴 [DEBUG] ❌ Künye container bulunamadı!")
+            print("🐴 [DEBUG] HTML'de 'kunye' araması: \(html.contains("kunye") ? "BULUNDU" : "BULUNAMADI")")
+            print("🐴 [DEBUG] HTML'de 'künye' araması: \(html.contains("künye") ? "BULUNDU" : "BULUNAMADI")")
+            
+            // HTML'deki class isimlerini görelim
+            let classPattern = "class=\"([^\"]+)\""
+            if let regex = try? NSRegularExpression(pattern: classPattern, options: []) {
+                let nsString = html as NSString
+                let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: nsString.length))
+                let classes = matches.compactMap { match -> String? in
+                    guard match.numberOfRanges > 1 else { return nil }
+                    return nsString.substring(with: match.range(at: 1))
+                }
+                print("🐴 [DEBUG] Bulunan class'lar (ilk 20): \(Array(Set(classes)).prefix(20))")
+            }
+            
             throw HtmlParserError.parsingFailed("Künye container bulunamadı")
         }
         
+        print("🐴 [DEBUG] ✅ Künye container bulundu! Uzunluk: \(kunyeContainer.count)")
+        print("🐴 [DEBUG] Container içeriği (ilk 300 karakter): \(String(kunyeContainer.prefix(300)))")
+        print("🐴 [DEBUG] Container içeriği (tam): \(kunyeContainer)")
+        
         // Künye bilgilerini parse et
-        let kunyeInfo = parseKunyeInfo(from: kunyeContainer)
+        let rawInfo = parseKunyeInfo(from: kunyeContainer)
+        print("🐴 [DEBUG] Parse edilen bilgiler:")
+        for (key, value) in rawInfo.sorted(by: { $0.key < $1.key }) {
+            print("🐴 [DEBUG]   \(key): \(value)")
+        }
         
-        // İstatistik bilgilerini parse et
-        let istatistikInfo = parseIstatistikInfo(from: html)
-        
-        return HorseDetailInfo(
-            kunyeBilgileri: kunyeInfo,
-            istatistikBilgileri: istatistikInfo
+        // Structured model'e dönüştür
+        let result = HorseDetailInfo(
+            isim: rawInfo["İsim"] ?? rawInfo["Isim"] ?? "",
+            yas: rawInfo["Yaş"] ?? rawInfo["Yas"] ?? "",
+            dogumTarihi: rawInfo["Doğ. Trh"] ?? rawInfo["Dog. Trh"] ?? "",
+            handikap: rawInfo["Handikap P."] ?? rawInfo["Handikap"] ?? "",
+            baba: rawInfo["Baba"] ?? "",
+            anne: rawInfo["Anne"] ?? "",
+            antrenor: rawInfo["Antrenör"] ?? rawInfo["Antrenor"] ?? "",
+            gercekSahip: rawInfo["Gerçek Sahip"] ?? rawInfo["Gercek Sahip"] ?? "",
+            uzerineKosanSahip: rawInfo["Üzerine Koşan Sahip"] ?? rawInfo["Uzerine Kosan Sahip"],
+            yetistirici: rawInfo["Yetiştirici"] ?? rawInfo["Yetistirici"] ?? "",
+            tercihAciklamasi: rawInfo["Tercih Açıklaması"] ?? rawInfo["Tercih Aciklamasi"],
+            ikramiye: rawInfo["Ikramiye"] ?? "",
+            atSahibiPrimi: rawInfo["At Sahibi Primi"] ?? "",
+            yurtdisiIkramiye: rawInfo["Yurtdışı Ikramiye"] ?? rawInfo["Yurtdisi Ikramiye"] ?? "",
+            kazanc: rawInfo["Kazanç"] ?? rawInfo["Kazanc"] ?? "",
+            yetistiricilikPrimi: rawInfo["Yetiştiricilik Primi"] ?? rawInfo["Yetistiricilik Primi"] ?? "",
+            sponsorlukGeliri: rawInfo["Sponsorluk Geliri"]
         )
+        
+        print("🐴 [DEBUG] ✅ Model oluşturuldu:")
+        print("🐴 [DEBUG]   İsim: \(result.isim)")
+        print("🐴 [DEBUG]   Yaş: \(result.yas)")
+        print("🐴 [DEBUG]   Baba: \(result.baba)")
+        
+        return result
     }
     
     /// Künye container'ı extract eder
@@ -273,101 +352,283 @@ extension HtmlParser {
     private func parseKunyeInfo(from html: String) -> [String: String] {
         var info: [String: String] = [:]
         
+        print("🔍 [DEBUG] parseKunyeInfo çağrıldı, HTML uzunluğu: \(html.count)")
+        
         // Tüm label-value çiftlerini bul
         let labelPattern = "<label[^>]*>(.*?)</label>"
         let labels = findAll(in: html, pattern: labelPattern, group: 1)
+        print("🔍 [DEBUG] Bulunan label sayısı: \(labels.count)")
+        print("🔍 [DEBUG] Label'lar: \(labels)")
         
         // Değerleri bul
         let rows = findTag("div", in: html, withClass: "row")
+        print("🔍 [DEBUG] Bulunan row sayısı: \(rows.count)")
         
-        for row in rows {
+        for (index, row) in rows.enumerated() {
+            print("🔍 [DEBUG] Row \(index) içeriği (ilk 200 karakter): \(String(row.prefix(200)))")
+            
             let cols = findTag("div", in: row, withClass: "col")
+            print("🔍 [DEBUG] Row \(index) col sayısı: \(cols.count)")
             
             if cols.count >= 2 {
                 let label = stripHTMLTags(from: cols[0])
                 let value = stripHTMLTags(from: cols[1])
                 
+                print("🔍 [DEBUG] Row \(index) - Label: '\(label)', Value: '\(value)'")
+                
                 if !label.isEmpty && !value.isEmpty {
                     // Label'dan : işaretini temizle
                     let cleanLabel = label.replacingOccurrences(of: ":", with: "").trimmingCharacters(in: .whitespaces)
                     info[cleanLabel] = value
+                    print("🔍 [DEBUG] ✅ Eklendi: '\(cleanLabel)' = '\(value)'")
                 }
             }
         }
         
-        // Eğer row-col yapısı bulunamazsa, alternatif yöntem
+        print("🔍 [DEBUG] Yöntem 1-2'den bulunan bilgi sayısı: \(info.count)")
+        
+        // Yöntem 2.5: Span key-value yapısı (TJK'nın kullandığı)
         if info.isEmpty {
-            let allLabels = findTag("label", in: html)
-            for label in allLabels {
-                let labelText = stripHTMLTags(from: label)
-                // Label'dan sonraki içeriği bul
-                if let labelRange = html.range(of: label) {
-                    let afterLabel = String(html[labelRange.upperBound...])
-                    // İlk closing tag'e kadar olan içeriği al
-                    if let valueMatch = findFirst(in: afterLabel, pattern: "^[^<]*(.*?)(?=<)", group: 0) {
-                        let value = stripHTMLTags(from: valueMatch)
-                        if !value.isEmpty {
-                            let cleanLabel = labelText.replacingOccurrences(of: ":", with: "").trimmingCharacters(in: .whitespaces)
-                            info[cleanLabel] = value
+            print("🔍 [DEBUG] ⚠️ Yöntem 2.5 deneniyor: Span key-value parsing...")
+            
+            // Manuel parsing - daha güvenilir
+            var currentIndex = html.startIndex
+            var spanCount = 0
+            
+            while currentIndex < html.endIndex {
+                // <span class="key"> ara
+                if let keyStartRange = html.range(of: "<span class=\"key\"", range: currentIndex..<html.endIndex) {
+                    // Key'in sonunu bul
+                    if let keyEndRange = html.range(of: "</span>", range: keyStartRange.upperBound..<html.endIndex) {
+                        // Key içeriğini al
+                        let keyContent = html[keyStartRange.upperBound..<keyEndRange.lowerBound]
+                        
+                        // > işaretinden sonrasını al (tag içeriği)
+                        if let contentStart = keyContent.range(of: ">") {
+                            let key = String(keyContent[contentStart.upperBound...])
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            
+                            // Şimdi value span'ını ara
+                            if let valueStartRange = html.range(of: "<span class=\"value\"", range: keyEndRange.upperBound..<html.endIndex) {
+                                // Value'nun sonunu bul - nested span'lar olabilir
+                                var searchPos = valueStartRange.upperBound
+                                var depth = 1
+                                var valueEndPos: String.Index?
+                                
+                                // > işaretini atla
+                                if let gtPos = html.range(of: ">", range: searchPos..<html.endIndex) {
+                                    searchPos = gtPos.upperBound
+                                    
+                                    // Nested span'ları say
+                                    while searchPos < html.endIndex && depth > 0 {
+                                        if let nextSpan = html.range(of: "<span", range: searchPos..<html.endIndex),
+                                           let nextClose = html.range(of: "</span>", range: searchPos..<html.endIndex) {
+                                            if nextSpan.lowerBound < nextClose.lowerBound {
+                                                depth += 1
+                                                searchPos = nextSpan.upperBound
+                                            } else {
+                                                depth -= 1
+                                                if depth == 0 {
+                                                    valueEndPos = nextClose.lowerBound
+                                                }
+                                                searchPos = nextClose.upperBound
+                                            }
+                                        } else if let nextClose = html.range(of: "</span>", range: searchPos..<html.endIndex) {
+                                            depth -= 1
+                                            if depth == 0 {
+                                                valueEndPos = nextClose.lowerBound
+                                            }
+                                            searchPos = nextClose.upperBound
+                                        } else {
+                                            break
+                                        }
+                                    }
+                                    
+                                    if let valueEnd = valueEndPos {
+                                        let rawValue = String(html[gtPos.upperBound..<valueEnd])
+                                        
+                                        // HTML'i decode et
+                                        let value = decodeHTMLEntities(stripHTMLTags(from: rawValue))
+                                            .replacingOccurrences(of: "&nbsp;", with: " ")
+                                            .replacingOccurrences(of: "  ", with: " ")
+                                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        
+                                        let cleanKey = decodeHTMLEntities(key)
+                                        
+                                        print("🔍 [DEBUG] Span \(spanCount) - Key: '\(cleanKey)', Value: '\(value)'")
+                                        spanCount += 1
+                                        
+                                        if !cleanKey.isEmpty {
+                                            info[cleanKey] = value
+                                            print("🔍 [DEBUG] ✅ Span'dan eklendi: '\(cleanKey)' = '\(value)'")
+                                        }
+                                        
+                                        currentIndex = searchPos
+                                        continue
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    currentIndex = html.index(after: keyStartRange.lowerBound)
+                } else {
+                    break
+                }
+            }
+            
+            print("🔍 [DEBUG] Toplam span çifti bulundu: \(spanCount)")
+        }
+        
+        print("🔍 [DEBUG] Yöntem 2.5'ten sonra bilgi sayısı: \(info.count)")
+        
+        // Yöntem 3: Tablo yapısı (<table>, <tr>, <td>)
+        if info.isEmpty {
+            print("🔍 [DEBUG] ⚠️ Yöntem 3 deneniyor: Table parsing...")
+            
+            let tableRows = findTag("tr", in: html)
+            print("🔍 [DEBUG] Bulunan table row sayısı: \(tableRows.count)")
+            
+            for (index, row) in tableRows.enumerated() {
+                let cells = findTag("td", in: row)
+                print("🔍 [DEBUG] TR \(index) cell sayısı: \(cells.count)")
+                
+                if cells.count >= 2 {
+                    let label = stripHTMLTags(from: cells[0]).trimmingCharacters(in: .whitespaces)
+                    let value = stripHTMLTags(from: cells[1]).trimmingCharacters(in: .whitespaces)
+                    
+                    print("🔍 [DEBUG] TR \(index) - Label: '\(label)', Value: '\(value)'")
+                    
+                    if !label.isEmpty && !value.isEmpty {
+                        let cleanLabel = label.replacingOccurrences(of: ":", with: "").trimmingCharacters(in: .whitespaces)
+                        info[cleanLabel] = value
+                        print("🔍 [DEBUG] ✅ Table'dan eklendi: '\(cleanLabel)' = '\(value)'")
+                    }
+                }
+            }
+        }
+        
+        print("🔍 [DEBUG] Yöntem 3'ten sonra bilgi sayısı: \(info.count)")
+        
+        // Yöntem 4: <strong> veya <b> tag'lı label'lar
+        if info.isEmpty {
+            print("🔍 [DEBUG] ⚠️ Yöntem 4 deneniyor: Strong/B tag parsing...")
+            
+            let strongPattern = "<strong[^>]*>([^<]+)</strong>\\s*([^<]+)"
+            if let regex = try? NSRegularExpression(pattern: strongPattern, options: []) {
+                let nsString = html as NSString
+                let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: nsString.length))
+                
+                print("🔍 [DEBUG] Strong tag matches: \(matches.count)")
+                
+                for (index, match) in matches.enumerated() {
+                    if match.numberOfRanges >= 3 {
+                        let label = nsString.substring(with: match.range(at: 1))
+                        let value = nsString.substring(with: match.range(at: 2))
+                        
+                        let cleanLabel = label.replacingOccurrences(of: ":", with: "").trimmingCharacters(in: .whitespaces)
+                        let cleanValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        print("🔍 [DEBUG] Strong \(index) - Label: '\(cleanLabel)', Value: '\(cleanValue)'")
+                        
+                        if !cleanLabel.isEmpty && !cleanValue.isEmpty {
+                            info[cleanLabel] = cleanValue
+                            print("🔍 [DEBUG] ✅ Strong'dan eklendi: '\(cleanLabel)' = '\(cleanValue)'")
                         }
                     }
                 }
             }
         }
         
-        return info
-    }
-    
-    /// İstatistik bilgilerini parse eder
-    private func parseIstatistikInfo(from html: String) -> [String: Any] {
-        var info: [String: Any] = [:]
+        print("🔍 [DEBUG] Yöntem 4'ten sonra bilgi sayısı: \(info.count)")
         
-        // İstatistik tablosunu bul
-        let tables = findTag("table", in: html)
-        
-        for table in tables {
-            let tableData = parseTable(in: table)
-            info.merge(tableData) { (_, new) in new }
+        // Yöntem 5: Alternatif - tüm label tag'leri
+        if info.isEmpty {
+            print("🔍 [DEBUG] ⚠️ Yöntem 5 deneniyor: Tüm label'lar...")
+            
+            let allLabels = findTag("label", in: html)
+            print("🔍 [DEBUG] Alternatif yöntem - bulunan label sayısı: \(allLabels.count)")
+            
+            for (index, label) in allLabels.enumerated() {
+                let labelText = stripHTMLTags(from: label)
+                print("🔍 [DEBUG] Alt. Label \(index): '\(labelText)'")
+                
+                if let labelRange = html.range(of: label) {
+                    let afterLabel = String(html[labelRange.upperBound...])
+                    if let valueMatch = findFirst(in: afterLabel, pattern: "^[^<]*(.*?)(?=<)", group: 0) {
+                        let value = stripHTMLTags(from: valueMatch)
+                        print("🔍 [DEBUG] Alt. Value \(index): '\(value)'")
+                        
+                        if !value.isEmpty {
+                            let cleanLabel = labelText.replacingOccurrences(of: ":", with: "").trimmingCharacters(in: .whitespaces)
+                            info[cleanLabel] = value
+                            print("🔍 [DEBUG] ✅ Alternatif yöntemle eklendi: '\(cleanLabel)' = '\(value)'")
+                        }
+                    }
+                }
+            }
         }
         
+        print("🔍 [DEBUG] Toplam parse edilen bilgi sayısı: \(info.count)")
         return info
     }
 }
 
 // MARK: - Models
 struct HorseDetailInfo: Codable {
-    var kunyeBilgileri: [String: String]
-    var istatistikBilgileri: [String: Any]
+    let isim: String
+    let yas: String
+    let dogumTarihi: String
+    let handikap: String
+    let baba: String
+    let anne: String
+    let antrenor: String
+    let gercekSahip: String
+    let uzerineKosanSahip: String?
+    let yetistirici: String
+    let tercihAciklamasi: String?
+    let ikramiye: String
+    let atSahibiPrimi: String
+    let yurtdisiIkramiye: String
+    let kazanc: String
+    let yetistiricilikPrimi: String
+    let sponsorlukGeliri: String?
     
-    enum CodingKeys: String, CodingKey {
-        case kunyeBilgileri
-        case istatistikBilgileri
-    }
-    
-    init(kunyeBilgileri: [String: String], istatistikBilgileri: [String: Any]) {
-        self.kunyeBilgileri = kunyeBilgileri
-        self.istatistikBilgileri = istatistikBilgileri
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        kunyeBilgileri = try container.decode([String: String].self, forKey: .kunyeBilgileri)
-        
-        // [String: Any] için özel decoding
-        if let istatistikDict = try? container.decode([String: String].self, forKey: .istatistikBilgileri) {
-            istatistikBilgileri = istatistikDict
-        } else {
-            istatistikBilgileri = [:]
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(kunyeBilgileri, forKey: .kunyeBilgileri)
-        
-        // [String: Any] için basit bir encoding (sadece String değerler)
-        let stringDict = istatistikBilgileri.compactMapValues { $0 as? String }
-        try container.encode(stringDict, forKey: .istatistikBilgileri)
+    init(
+        isim: String = "",
+        yas: String = "",
+        dogumTarihi: String = "",
+        handikap: String = "",
+        baba: String = "",
+        anne: String = "",
+        antrenor: String = "",
+        gercekSahip: String = "",
+        uzerineKosanSahip: String? = nil,
+        yetistirici: String = "",
+        tercihAciklamasi: String? = nil,
+        ikramiye: String = "",
+        atSahibiPrimi: String = "",
+        yurtdisiIkramiye: String = "",
+        kazanc: String = "",
+        yetistiricilikPrimi: String = "",
+        sponsorlukGeliri: String? = nil
+    ) {
+        self.isim = isim
+        self.yas = yas
+        self.dogumTarihi = dogumTarihi
+        self.handikap = handikap
+        self.baba = baba
+        self.anne = anne
+        self.antrenor = antrenor
+        self.gercekSahip = gercekSahip
+        self.uzerineKosanSahip = uzerineKosanSahip
+        self.yetistirici = yetistirici
+        self.tercihAciklamasi = tercihAciklamasi
+        self.ikramiye = ikramiye
+        self.atSahibiPrimi = atSahibiPrimi
+        self.yurtdisiIkramiye = yurtdisiIkramiye
+        self.kazanc = kazanc
+        self.yetistiricilikPrimi = yetistiricilikPrimi
+        self.sponsorlukGeliri = sponsorlukGeliri
     }
 }
 

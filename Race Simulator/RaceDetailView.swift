@@ -1,6 +1,13 @@
 import SwiftUI
 import AVKit
 
+// MARK: - Horse Code Wrapper
+struct HorseCodeWrapper: Identifiable {
+    let id = UUID()
+    let code: String
+    let formaURL: String?
+}
+
 struct RaceDetailView: View {
     // MARK: - PROPERTIES
     @State var raceName: String
@@ -29,6 +36,9 @@ struct RaceDetailView: View {
     
     // Popup kart için state
     @State private var isCardExpanded: Bool = true
+    
+    // Detay sayfası navigation için
+    @State private var selectedHorseCode: HorseCodeWrapper?
     
     let parser = JsonParser()
     let apiDateFormatter: DateFormatter = {
@@ -71,6 +81,12 @@ struct RaceDetailView: View {
             .onAppear(perform: handleOnAppear)
             .overlay(alignment: .leading, content: popupCardOverlay)
             .overlay(content: mediaOverlay)
+            .sheet(item: $selectedHorseCode) { horseCode in
+                HorseDetailView(
+                    horseCode: horseCode.code,
+                    formaURL: horseCode.formaURL
+                )
+            }
     }
     
     private var mainContent: some View {
@@ -111,7 +127,12 @@ struct RaceDetailView: View {
                 resultsHeaderView(results: results)
                 
                 ForEach(finishers.sorted(by: { $0.rankInt < $1.rankInt })) { finisher in
-                    ResultRowView(finisher: finisher)
+                    ResultRowView(finisher: finisher, onSwipeAction: { atKodu in
+                        selectedHorseCode = HorseCodeWrapper(
+                            code: atKodu,
+                            formaURL: finisher.FORMA
+                        )
+                    })
                 }
                 Color.clear.frame(height: 50)
             }
@@ -202,8 +223,11 @@ struct RaceDetailView: View {
                 
                 if let atlar = seciliKosu.atlar, !atlar.isEmpty {
                     ForEach(atlar) { at in
-                        ListItemView(at: at, onSwipeAction: {
-                            print("ANALİZ: \(at.AD ?? "")")
+                        ListItemView(at: at, onSwipeAction: { atKodu in
+                            selectedHorseCode = HorseCodeWrapper(
+                                code: atKodu,
+                                formaURL: at.FORMA
+                            )
                         })
                         .padding(.horizontal)
                     }
