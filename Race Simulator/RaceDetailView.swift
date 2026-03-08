@@ -202,8 +202,10 @@ struct RaceDetailView: View {
                 
                 if let atlar = seciliKosu.atlar, !atlar.isEmpty {
                     ForEach(atlar) { at in
-                        ListItemView(at: at)
-                            .padding(.horizontal)
+                        ListItemView(at: at, onSwipeAction: {
+                            print("ANALİZ: \(at.AD ?? "")")
+                        })
+                        .padding(.horizontal)
                     }
                     Color.clear.frame(height: 50)
                 } else {
