@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RaceInfoCardPopup: View {
+    
     // MARK: - Properties
     @Binding var isExpanded: Bool
     let race: Race
@@ -14,6 +15,7 @@ struct RaceInfoCardPopup: View {
     @State private var agfResults: AGFResultData?
     @State private var isLoadingResults = false
     @State private var selectedResultType = 1
+    @State private var refreshTimer: Timer? = nil
     
     enum CardPosition { case leading, bottom }
     let position: CardPosition
@@ -25,7 +27,13 @@ struct RaceInfoCardPopup: View {
     // MARK: - Body
     var body: some View {
         content
-            .task(id: cityName) { await loadAGFResults() }
+            .task(id: cityName) {
+                await loadAGFResults()
+                startTimer()
+            }
+            .onDisappear {
+                stopTimer()
+            }
             .onChange(of: allResultsLoaded) { _, loaded in
                 if loaded { Task { await loadAGFResults() } }
             }
@@ -39,6 +47,20 @@ struct RaceInfoCardPopup: View {
                 bottomPositionCard
             }
         }
+    }
+    
+    private func startTimer() {
+        stopTimer()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            Task {
+                await loadAGFResults()
+            }
+        }
+    }
+    
+    private func stopTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
     
     // MARK: - Load Results
@@ -368,17 +390,15 @@ struct RaceInfoCardPopup: View {
                 }
                 
                 let currentAltili = selectedResultType == 1 ? results.altili1 : results.altili2
-                // Bugünkü veri için modeline eklediğimiz tevzi1/2'yi kullanıyoruz
                 let currentTevzi = selectedResultType == 1 ? results.tevzi1 : results.tevzi2
-                
                 
                 if currentTevzi != nil || currentAltili != nil {
                     HStack(spacing: 0) {
-                        // --- 1. Tevzi Bölümü ---
+                        
                         if let tevzi = currentTevzi {
                             HStack(spacing: 10) {
                                 Image(systemName: "banknote.fill")
-                                    .foregroundColor(.green.opacity(0.8))
+                                    .foregroundColor(.cyan.opacity(0.8))
                                     .font(.system(size: 14))
                                 
                                 VStack(alignment: .leading, spacing: 1) {
@@ -388,13 +408,12 @@ struct RaceInfoCardPopup: View {
                                     
                                     Text(tevzi + " ₺")
                                         .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.cyan)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         
-                        // Eğer her iki veri de varsa araya dikey ince bir çizgi
                         if currentTevzi != nil && currentAltili != nil {
                             Rectangle()
                                 .fill(Color.white.opacity(0.1))
@@ -402,7 +421,6 @@ struct RaceInfoCardPopup: View {
                                 .padding(.horizontal, 12)
                         }
                         
-                        // --- 2. Altılı Bölümü ---
                         if let altili = currentAltili {
                             HStack(spacing: 10) {
                                 Image(systemName: "trophy.fill")
@@ -553,10 +571,10 @@ struct AGFResultData {
     let hasType2: Bool
     let type1Legs: [LegResult]
     let type2Legs: [LegResult]
-    let tevzi1: String? // 1. Altılı için Tevzi
-    let tevzi2: String? // 2. Altılı için Tevzi
-    let altili1: String?  // 1. Altılı Ganyan tutarı
-    let altili2: String?  // 2. Altılı Ganyan tutarı
+    let tevzi1: String?
+    let tevzi2: String?
+    let altili1: String?
+    let altili2: String?
     let aciklama: String?
     
     init?(fromArray array: [[String: Any]]) {
@@ -564,10 +582,19 @@ struct AGFResultData {
         var t2: [LegResult] = []
         var tvz1: String? = nil
         var tvz2: String? = nil
+        var a1: String? = nil
+        var a2: String? = nil
         
         for dict in array {
             let rank = dict["rank"] as? Int ?? 0
             let tevziMiktari = dict["Tevzi"] as? String
+            
+            var altiliTutari: String? = nil
+            if let altiliStr = dict["Altili"] as? String {
+                altiliTutari = altiliStr // Eğer rakam geldiyse al
+            } else if let altiliBool = dict["Altili"] as? Bool, altiliBool == true {
+                altiliTutari = nil
+            }
             
             var legs: [LegResult] = []
             for i in 1...6 {
@@ -580,9 +607,11 @@ struct AGFResultData {
             if rank == 1 {
                 t1 = legs
                 tvz1 = tevziMiktari
+                a1 = altiliTutari
             } else if rank == 2 {
                 t2 = legs
                 tvz2 = tevziMiktari
+                a2 = altiliTutari
             }
         }
         
@@ -594,30 +623,19 @@ struct AGFResultData {
         self.hasType2 = !t2.isEmpty
         self.tevzi1 = tvz1
         self.tevzi2 = tvz2
-        self.altili1 = nil
-        self.altili2 = nil
+        self.altili1 = a1
+        self.altili2 = a2
         self.aciklama = nil
     }
     
-    
-    init(type1Legs: [LegResult],
-         type2Legs: [LegResult],
-         tevzi1: String?,
-         tevzi2: String?,
-         altili1: String?,
-         altili2: String?,
-         aciklama: String?) {
-        
+    // Manuel init (Aynen kalabilir)
+    init(type1Legs: [LegResult], type2Legs: [LegResult], tevzi1: String?, tevzi2: String?, altili1: String?, altili2: String?, aciklama: String?) {
         self.type1Legs = type1Legs
         self.type2Legs = type2Legs
         self.hasType1 = !type1Legs.isEmpty
         self.hasType2 = !type2Legs.isEmpty
-        
-        // Yeni tevzi alanlarını atıyoruz
         self.tevzi1 = tevzi1
         self.tevzi2 = tevzi2
-        
-        // Kazanç tutarları
         self.altili1 = altili1
         self.altili2 = altili2
         self.aciklama = aciklama

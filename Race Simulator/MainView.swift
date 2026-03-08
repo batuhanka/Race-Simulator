@@ -34,6 +34,13 @@ struct MainView: View {
     }()
     
     private func fetchDetailsAndNavigate(for city: String) {
+        // 🔄 Önce eski verileri temizle
+        selectedRace = nil
+        havaData = nil
+        kosular = []
+        agf = []
+        showRaceDetails = false
+        
         isGlobalFetching = true
         
         Task {
@@ -45,22 +52,30 @@ struct MainView: View {
                 )
                 
                 await MainActor.run {
-                    if let havaDict = program["hava"] as? [String: Any] { havaData = HavaData(from: havaDict) }
+                    if let havaDict = program["hava"] as? [String: Any] { 
+                        havaData = HavaData(from: havaDict)
+                    }
                     if let kosularArray = program["kosular"] as? [[String: Any]] {
                         do {
                             let data = try JSONSerialization.data(withJSONObject: kosularArray)
                             kosular = try JSONDecoder().decode([Race].self, from: data)
-                        } catch { print("Decode hatası: \(error)") }
+                        } catch { 
+                            print("Decode error: \(error)") 
+                        }
                     }
-                    if let agfArray = program["agf"] as? [[String: Any]] { agf = agfArray }
+                    if let agfArray = program["agf"] as? [[String: Any]] { 
+                        agf = agfArray
+                    }
                     
                     self.selectedRace = city
                     self.showRaceDetails = true
                     self.isGlobalFetching = false
                 }
             } catch {
-                print("Veri çekme hatası: \(error)")
-                isGlobalFetching = false
+                print("Error fetching data: \(error)")
+                await MainActor.run {
+                    isGlobalFetching = false
+                }
             }
         }
     }
@@ -83,6 +98,7 @@ struct MainView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
+                    .padding(.bottom, 100) // Alt tab bar için boşluk
                 }
                 .background(
                     RadialGradient(
@@ -122,6 +138,7 @@ struct MainView: View {
                         selectedDate: selectedDate,
                         selectedBottomTab: $selectedBottomTab
                     )
+                    .id("\(race)-\(apiDateFormatter.string(from: selectedDate))")
                 }
             }
             .navigationDestination(isPresented: $showSimulation) {

@@ -130,25 +130,57 @@ struct RaceCardButton: View {
     
     private func fetchRaceDetails() {
         isFetching = true
+        
+        // 🔄 ÖNEMLİ: Önce navigation'ı kapat
+        showRaceDetails = false
+        
         Task {
-            defer { isFetching = false }
+            // SwiftUI'nin state güncellemesini işlemesi için küçük bir delay
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 saniye
+            
+            // Şimdi verileri temizle
+            await MainActor.run {
+                selectedRace = nil
+                havaData = nil
+                kosular = []
+                agf = []
+            }
+            
             do {
                 let program = try await parser.getProgramData(
                     raceDate: dateFormatter.string(from: selectedDate),
                     cityName: raceName
                 )
-                if let havaDict = program["hava"] as? [String: Any] { havaData = HavaData(from: havaDict) }
-                if let kosularArray = program["kosular"] as? [[String: Any]] {
-                    let data = try JSONSerialization.data(withJSONObject: kosularArray)
-                    kosular = try JSONDecoder().decode([Race].self, from: data)
-                }
-                if let agfArray = program["agf"] as? [[String: Any]] { agf = agfArray }
+                
                 await MainActor.run {
+                    // Verileri parse et
+                    if let havaDict = program["hava"] as? [String: Any] { 
+                        havaData = HavaData(from: havaDict)
+                    }
+                    if let kosularArray = program["kosular"] as? [[String: Any]] {
+                        do {
+                            let data = try JSONSerialization.data(withJSONObject: kosularArray)
+                            kosular = try JSONDecoder().decode([Race].self, from: data)
+                        } catch {
+                            print("Decode error: \(error)")
+                        }
+                    }
+                    if let agfArray = program["agf"] as? [[String: Any]] { 
+                        agf = agfArray
+                    }
+                    
+                    // ÖNEMLİ: Tüm veriler yüklendikten sonra navigation'ı tetikle
                     selectedRace = raceName
+                    
+                    // Yeni view ile navigation'ı aç
                     showRaceDetails = true
+                    isFetching = false
                 }
             } catch {
-                print("Detay getirme hatası: \(error)")
+                print("Error fetching race details: \(error)")
+                await MainActor.run {
+                    isFetching = false
+                }
             }
         }
     }

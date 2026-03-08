@@ -188,9 +188,6 @@ class JsonParser {
     }
     
     
-    /// Belirli bir şehir için gerçek yarış sonuçlarını getirir (AGF değil, koşu sonuçları)
-    /// - Parameter cityName: Şehir ismi (örnek: "IZMIR")
-    /// - Returns: Sonuç verilerini içeren dictionary
     func getCityRaceActualResults(cityName: String) async throws -> [[String: Any]] { // Dönüş tipi artık Array
         
         // 1. Checksum'ı al
@@ -217,7 +214,6 @@ class JsonParser {
                           userInfo: [NSLocalizedDescriptionKey: "JSON formatı Array beklerken farklı geldi."])
         }
         
-        print("Başarıyla \(jsonArray.count) adet sonuç çekildi.")
         return jsonArray
     }
     

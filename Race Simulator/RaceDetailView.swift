@@ -533,10 +533,19 @@ extension RaceDetailView {
 extension RaceDetailView {
 
     private func upcomingRaceIndex() -> Int {
+        // Sadece bugünkü koşular için upcoming race bulma işlemi yap
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let selectedDayStart = calendar.startOfDay(for: selectedDate)
+        
+        // Eğer seçili tarih bugün değilse, ilk koşuyu döndür
+        guard today == selectedDayStart else {
+            return 0
+        }
+        
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         let now = Date()
-        let calendar = Calendar.current
 
         var upcomingIndex: Int? = nil
         var upcomingDiff: TimeInterval = .infinity
