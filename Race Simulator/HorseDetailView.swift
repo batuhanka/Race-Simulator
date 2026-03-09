@@ -169,7 +169,7 @@ struct HorseDetailView: View {
                                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 20)
                     .padding(.top, 12)
 
                     Spacer()
@@ -199,7 +199,7 @@ struct HorseDetailView: View {
                                 )
                         )
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 14)
                 }
             }
@@ -408,7 +408,7 @@ struct HorseDetailView: View {
             Text("KAZANÇ")
                 .frame(width: 80, alignment: .trailing)
         }
-        .font(.system(size: 9, weight: .bold))
+        .font(.system(size: 12, weight: .bold))
         .foregroundColor(.white.opacity(0.45))
         .tracking(0.5)
     }
@@ -425,7 +425,7 @@ struct HorseDetailView: View {
                 .foregroundColor(.white.opacity(0.7))
             Text(row.birinci)
                 .frame(width: 24, alignment: .center)
-                .foregroundColor(row.birinci != "0" ? .orange : .white.opacity(0.5))
+                .foregroundColor(row.birinci != "0" ? .orange : .white.opacity(0.3))
             Text(row.ikinci)
                 .frame(width: 24, alignment: .center)
                 .foregroundColor(row.ikinci != "0" ? .white.opacity(0.85) : .white.opacity(0.5))
@@ -535,26 +535,18 @@ struct HorseDetailView: View {
 
     @ViewBuilder
     private func sortHeader(_ title: String, key: RaceHistorySortKey,
-                             width: CGFloat, align: Alignment = .center,
-                             padLeading: CGFloat = 0) -> some View {
+                             width: CGFloat, alignment: Alignment = .center) -> some View {
         Button {
             if sortKey == key { sortAscending.toggle() }
             else { sortKey = key; sortAscending = true }
         } label: {
-            HStack(spacing: 2) {
-                if padLeading > 0 { Color.clear.frame(width: padLeading) }
-                if align == .trailing { Spacer(minLength: 0) }
-                Text(title)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                if sortKey == key {
-                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 7, weight: .bold))
-                }
-                if align == .leading { Spacer(minLength: 0) }
-            }
-            .frame(width: width)
-            .foregroundColor(sortKey == key ? .cyan : .white.opacity(0.4))
+            let isActive = sortKey == key
+            let label = isActive ? title + (sortAscending ? " ↑" : " ↓") : title
+            Text(label)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundColor(isActive ? .cyan : .white.opacity(0.45))
+                .frame(width: width, alignment: alignment)
         }
         .buttonStyle(.plain)
     }
@@ -574,21 +566,17 @@ struct HorseDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 VStack(spacing: 0) {
                     raceHistoryHeader
-                        .padding(.leading, 14)
-                        .padding(.trailing, 10)
 
                     Rectangle()
                         .fill(Color.cyan.opacity(0.2))
                         .frame(height: 1)
-                        .padding(.leading, 14)
-                        .padding(.trailing, 10)
+                        .padding(.horizontal, 14)
                         .padding(.top, 4)
 
                     ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
                         raceHistoryRow(row: row, idx: idx, isEven: idx % 2 == 0)
                     }
                 }
-                .frame(minWidth: max(UIScreen.main.bounds.width - 32, 1150))
             }
 
             Spacer(minLength: 14)
@@ -598,190 +586,154 @@ struct HorseDetailView: View {
     }
 
     private var raceHistoryHeader: some View {
-        HStack(spacing: 0) {
-            sortHeader("SONUÇ",      key: .sira,     width: 56, align: .leading)
-            sortHeader("TARİH",      key: .tarih,    width: 72, align: .leading, padLeading: 6)
-            sortHeader("ŞEHİR",      key: .sehir,    width: 72, align: .leading)
-            sortHeader("MSF",        key: .mesafe,   width: 60)
-            sortHeader("SKL",        key: .siklet,   width: 42)
-            sortHeader("DERECE",     key: .derece,   width: 70, align: .trailing)
-            sortHeader("JOKEY",      key: .jokey,    width: 78, align: .trailing)
-            sortHeader("GNY",        key: .ganyan,   width: 48, align: .trailing)
-            sortHeader("GRP",        key: .grup,     width: 42)
-            sortHeader("KOŞU CİNSİ", key: .kosuCins, width: 96, align: .leading, padLeading: 6)
-            sortHeader("TAKI",       key: .taki,     width: 48)
-            sortHeader("ANTRENÖR",   key: .antrenor, width: 84, align: .leading, padLeading: 6)
-            sortHeader("SAHİP",      key: .sahip,    width: 110, align: .leading, padLeading: 6)
-            sortHeader("HP",         key: .hp,       width: 38)
-            sortHeader("İKRAMİYE",   key: .ikramiye, width: 88, align: .trailing)
-            Text("▶").frame(width: 44, alignment: .center).foregroundColor(.white.opacity(0.4))
-            Text("📷").frame(width: 44, alignment: .center).foregroundColor(.white.opacity(0.4))
+        HStack(spacing: 14) {
+            sortHeader("SONUÇ",    key: .sira,     width: 52)
+            sortHeader("TARİH",    key: .tarih,    width: 90, alignment: .leading)
+            sortHeader("ŞEHİR",    key: .sehir,    width: 68, alignment: .leading)
+            sortHeader("MESAFE",   key: .mesafe,   width: 58, alignment: .leading)
+            sortHeader("KİLO",     key: .siklet,   width: 42, alignment: .leading)
+            sortHeader("DERECE",   key: .derece,   width: 68, alignment: .leading)
+            sortHeader("JOKEY",    key: .jokey,    width: 76, alignment: .leading)
+            sortHeader("GANYAN",   key: .ganyan,   width: 48, alignment: .leading)
+            sortHeader("GRUP",     key: .grup,     width: 40, alignment: .leading)
+            sortHeader("KOŞU",     key: .kosuCins, width: 90, alignment: .leading)
+            sortHeader("TAKI",     key: .taki,     width: 66, alignment: .leading)
+            sortHeader("ANTRENÖR", key: .antrenor, width: 80, alignment: .leading)
+            sortHeader("SAHİP",    key: .sahip,    width: 104,alignment: .leading)
+            sortHeader("HP",       key: .hp,       width: 38, alignment: .leading)
+            sortHeader("İKRAMİYE", key: .ikramiye, width: 84, alignment: .leading)
+            Text("İZLE").frame(width: 52, alignment: .center).foregroundColor(.white.opacity(0.45))
+            Text("FOTO").frame(width: 46, alignment: .center).foregroundColor(.white.opacity(0.45))
         }
-        .font(.system(size: 12, weight: .bold))
+        .font(.system(size: 11, weight: .bold))
+        .foregroundColor(.white.opacity(0.45))
         .tracking(0.5)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 20)
     }
 
     @ViewBuilder
     private func raceHistoryRow(row: HorseRaceHistoryRow, idx: Int, isEven: Bool) -> some View {
         let dim: Double = row.kosmazMi ? 0.35 : 1.0
-        HStack(spacing: 0) {
+        HStack(spacing: 14) {
             // Sonuç — büyük sıralama rakamı
             sonucView(row.sira, kosmazMi: row.kosmazMi)
-                .frame(width: 56, alignment: .leading)
-
+                .frame(width: 52, alignment: .center)
             Text(shortDate(row.tarih))
-                .frame(width: 72, alignment: .leading)
-                .padding(.leading, 6)
+                .frame(width: 90, alignment: .leading)
                 .foregroundColor(.white.opacity(0.75 * dim))
-
+                .lineLimit(1)
             Text(row.sehir)
-                .frame(width: 72, alignment: .leading)
+                .frame(width: 68, alignment: .leading)
                 .foregroundColor(.white.opacity(0.9 * dim))
                 .lineLimit(1)
-
-            // Mesafe — pist renginde arka plan
             Text(row.mesafe)
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(pistColor(row.pist).opacity(row.kosmazMi ? 0.35 : 0.75))
+                .padding(.horizontal, 5).padding(.vertical, 2)
+                .background(pistColor(row.pist).opacity(row.kosmazMi ? 0.3 : 0.75))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-                .frame(width: 60, alignment: .center)
-
+                .frame(width: 58, alignment: .leading)
             Text(row.siklet.isEmpty ? "–" : row.siklet)
-                .frame(width: 42, alignment: .center)
+                .frame(width: 42, alignment: .leading)
                 .foregroundColor(.white.opacity(0.65 * dim))
-
             Text(row.derece.isEmpty ? "–" : row.derece)
-                .frame(width: 70, alignment: .trailing)
-                .foregroundColor(row.derece.isEmpty ? .white.opacity(0.25) : .white.opacity(0.8 * dim))
-
+                .frame(width: 68, alignment: .leading)
+                .foregroundColor(row.derece.isEmpty ? .white.opacity(0.2) : .white.opacity(0.8 * dim))
             Text(row.kosmazMi ? "Koşmaz" : row.jokey)
-                .frame(width: 78, alignment: .trailing)
+                .frame(width: 76, alignment: .leading)
                 .foregroundColor(row.kosmazMi ? .white.opacity(0.3) : .cyan.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-
+                .lineLimit(1).minimumScaleFactor(0.8)
             Text(row.ganyan.isEmpty ? "–" : row.ganyan)
-                .frame(width: 48, alignment: .trailing)
-                .foregroundColor(row.ganyan.isEmpty ? .white.opacity(0.25) : .orange.opacity(0.85))
-
+                .frame(width: 48, alignment: .leading)
+                .foregroundColor(row.ganyan.isEmpty ? .white.opacity(0.2) : .orange.opacity(0.85))
             Text(row.grup.isEmpty ? "–" : row.grup)
-                .frame(width: 42, alignment: .center)
+                .frame(width: 40, alignment: .leading)
                 .foregroundColor(.white.opacity(0.55 * dim))
-
             Text(row.kosuCins.isEmpty ? "–" : row.kosuCins)
-                .frame(width: 96, alignment: .leading)
-                .padding(.leading, 6)
+                .frame(width: 90, alignment: .leading)
                 .foregroundColor(.white.opacity(0.75 * dim))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-
+                .lineLimit(1).minimumScaleFactor(0.8)
             Text(row.taki.isEmpty ? "–" : row.taki)
-                .frame(width: 48, alignment: .center)
+                .frame(width: 66, alignment: .leading)
                 .foregroundColor(.white.opacity(0.55 * dim))
                 .lineLimit(1)
-
             Text(row.antrenor.isEmpty ? "–" : row.antrenor)
-                .frame(width: 84, alignment: .leading)
-                .padding(.leading, 6)
+                .frame(width: 80, alignment: .leading)
                 .foregroundColor(.white.opacity(0.65 * dim))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
+                .lineLimit(1).minimumScaleFactor(0.8)
             Text(row.sahip.isEmpty ? "–" : row.sahip)
-                .frame(width: 110, alignment: .leading)
-                .padding(.leading, 6)
+                .frame(width: 104, alignment: .leading)
                 .foregroundColor(.white.opacity(0.65 * dim))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-
+                .lineLimit(1).minimumScaleFactor(0.75)
             Text(row.hp.isEmpty ? "–" : row.hp)
-                .frame(width: 38, alignment: .center)
+                .frame(width: 38, alignment: .leading)
                 .foregroundColor(.white.opacity(0.55 * dim))
-
             Text(row.ikramiye.isEmpty ? "–" : row.ikramiye)
-                .frame(width: 88, alignment: .trailing)
+                .frame(width: 84, alignment: .leading)
                 .foregroundColor(.white.opacity(0.65 * dim))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-
-            // Video — CDN mp4 URL'ini çekerek açar
+                .lineLimit(1).minimumScaleFactor(0.75)
+            // Video
             if let videoPageUrl = row.videoUrl {
                 Button {
                     Task {
                         loadingVideoIdx = idx
                         let cdnUrl = await HtmlParser.shared.fetchVideoUrl(from: videoPageUrl)
-                        let target = cdnUrl ?? videoPageUrl   // CDN başarısız olursa TJK sayfasını aç
-                        if let url = URL(string: target) {
-                            await UIApplication.shared.open(url)
-                        }
+                        let target = cdnUrl ?? videoPageUrl
+                        if let url = URL(string: target) { await UIApplication.shared.open(url) }
                         loadingVideoIdx = nil
                     }
                 } label: {
                     if loadingVideoIdx == idx {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(.cyan)
+                        ProgressView().scaleEffect(0.65).tint(.cyan)
+                            .frame(width: 52, alignment: .leading)
                     } else {
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: 24))
                             .foregroundColor(.cyan.opacity(0.9))
+                            .frame(width: 52, alignment: .center)
                     }
                 }
-                .frame(width: 44, height: 36, alignment: .center)
                 .contentShape(Rectangle())
             } else {
-                Text("–")
-                    .frame(width: 44, alignment: .center)
-                    .foregroundColor(.white.opacity(0.2))
+                Text("–").frame(width: 52, alignment: .leading).foregroundColor(.white.opacity(0.2))
             }
 
-            // Foto — doğrudan URL'i açar
             if let fotoUrl = row.fotoUrl, let url = URL(string: fotoUrl) {
                 Button {
                     Task { await UIApplication.shared.open(url) }
                 } label: {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 19))
+                        .font(.system(size: 24))
                         .foregroundColor(.orange.opacity(0.9))
+                        .frame(width: 46, alignment: .center)
                 }
-                .frame(width: 44, height: 36, alignment: .center)
                 .contentShape(Rectangle())
             } else {
-                Text("–")
-                    .frame(width: 44, alignment: .center)
-                    .foregroundColor(.white.opacity(0.2))
+                Text("–").frame(width: 46, alignment: .leading).foregroundColor(.white.opacity(0.2))
             }
         }
-        .font(.system(size: 14, weight: .medium))
-        .padding(.vertical, 9)
-        .padding(.leading, 14)
-        .padding(.trailing, 10)
+        .font(.system(size: 13, weight: .medium))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 20)
         .background(isEven ? Color.white.opacity(0.03) : Color.clear)
     }
 
-    
     @ViewBuilder
     private func sonucView(_ sira: String, kosmazMi: Bool) -> some View {
         let trimmed = sira.trimmingCharacters(in: .whitespaces)
         let isPodium = ["1", "2", "3"].contains(trimmed)
-        if kosmazMi {
+        if kosmazMi || trimmed.isEmpty {
             Text("–")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.2))
-        } else if trimmed.isEmpty {
-            Text("–")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(.white.opacity(0.2))
         } else if isPodium {
-            Text(trimmed)
-                .font(.system(size: 26, weight: .black))
+            Text("\(trimmed).")
+                .font(.system(size: 18, weight: .black))
                 .foregroundColor(.orange)
         } else {
-            Text(trimmed)
-                .font(.system(size: 22, weight: .bold))
+            Text("\(trimmed).")
+                .font(.system(size: 16, weight: .bold))
                 .foregroundColor(.white.opacity(0.75))
         }
     }
@@ -793,10 +745,9 @@ struct HorseDetailView: View {
     }
 
     private func shortDate(_ date: String) -> String {
-        // "09.03.2026" → "09.03.26"
         let parts = date.split(separator: ".")
         guard parts.count == 3 else { return date }
-        let year = String(parts[2].suffix(2))
+        let year = String(parts[2].suffix(4))
         return "\(parts[0]).\(parts[1]).\(year)"
     }
 
@@ -807,6 +758,7 @@ struct HorseDetailView: View {
             .padding(.horizontal, 6)
     }
 }
+
 
 #Preview("Canlı Veri - 101209") {
     HorseDetailView(

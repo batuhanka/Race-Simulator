@@ -23,9 +23,9 @@ struct ResultRowView: View {
             }
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: "chart.bar.fill")
+                Image(systemName: "text.page.badge.magnifyingglass")
                     .font(.system(size: 20, weight: .semibold))
-                Text("ANALİZ")
+                Text("DETAY")
                     .font(.system(size: 10, weight: .bold))
                     .kerning(0.5)
             }
