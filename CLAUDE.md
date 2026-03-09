@@ -14,18 +14,20 @@ Open `Race Simulator.xcodeproj` in Xcode and build/run via Xcode (⌘R). No exte
 
 **Pattern:** SwiftUI + MVVM-lite. Simple state lives in views via `@State`/`@Binding`. Complex state uses `@Observable` ViewModels (`OddsViewModel`, `TicketViewModel`). No Combine, no centralized store.
 
-**Navigation:** `NavigationStack` + custom tab bar (`CustomBottomBar.swift`). Entry: `RootView` (Matrix splash, 3s) → `MainShellView` (5-tab container).
+**Navigation:** `NavigationStack` + custom tab bar (`CustomBottomBar.swift`). Entry: `RootView` (Matrix splash + particle explosion, 3s) → `MainShellView` (5-tab container).
 
 **Tabs (0–4):**
-0. Home (`MainView`) — date picker, city race cards
-1. Program (`RaceDetailView`) — horse list, AGF, results, photo/video
+0. Home (`MainView`) — date picker, city race cards, simulation launcher card
+1. Program (`RaceDetailView`) — horse list (tapping a horse → `HorseDetailView`), AGF, results, photo/video
 2. AI insights (prepared, not implemented)
 3. Odds (`OddsView` + `OddsViewModel`) — Muhtemeller & AGF tables, live refresh every 15s
 4. Tickets (`TicketSetupView` + `TicketViewModel`) — kupon creation with AI generation
 
-## Networking — JsonParser.swift
+**Simulation flow:** `MainView` → `SimulationSetupView` (portrait; city + race picker, horse preview with `AnimatedHorseCard`) → `SimulationViewHorse3D` (landscape, SceneKit with `thehorse.usdz`). Orientation switch uses `AppDelegate.orientationLock` static property; iOS 16+ path preferred over `UIDevice.setValue`.
 
-Single API client. All calls `async/await` + `URLSession`. Key endpoints:
+## Networking
+
+**`JsonParser.swift`** — Single API client. All calls `async/await` + `URLSession`. Key endpoints:
 
 | Method | URL pattern | Returns |
 |--------|-------------|---------|
@@ -38,6 +40,8 @@ Single API client. All calls `async/await` + `URLSession`. Key endpoints:
 | `getBetData()` | `ebayi.tjk.org/s/d/bet/checksum.json` → `emedya-cdn.tjk.org/.../bet-{hash}.json` | `BetDataResponse` |
 
 **Date format:** `yyyyMMdd` for program/results, `yyyy/MM/dd` for Muhtemeller.
+
+**`HtmlParser.swift`** — Scrapes TJK website for horse detail data (`parseAtKosuBilgileri(atId:)`). Endpoint: `tjk.org/TR/YarisSever/Query/ConnectedPage/AtKosuBilgileri`. Uses regex with 5-level fallback (span → div → table → strong → label). Handles mixed encodings: UTF-8 → ISO-Latin1 → Windows-1254.
 
 ## Domain Conventions
 
@@ -52,6 +56,8 @@ Single API client. All calls `async/await` + `URLSession`. Key endpoints:
 **Mixed-type JSON fields** — Many API fields arrive as either String or Bool (e.g. `ONEMLIKOSUADI_TR` can be a race name String or `false`). Use `try? container.decodeIfPresent(String.self, ...)` first, then fall back. See `Race.swift` `decodeSafeBool` helper and `ONEMLIKOSUADI_TR` decoder pattern.
 
 **CDN URLs** — Horse forma images: `medya.tjk.org` → replace with `medya-cdn.tjk.org` (HTTPS). Done in `Horse.swift` Codable init. Ekuri icons: `medya-cdn.tjk.org/imageftp/Img/e{ekuri}.gif`.
+
+**AGF decimal format** — AGF values arrive as String with comma decimal (e.g. `"12,5"`). Replace `","` → `"."` before parsing to `Float`.
 
 ## Shared UI Patterns
 
@@ -83,12 +89,17 @@ Background: `Color.black` base + `LinearGradient` top-to-bottom, `.animation(.ea
 
 | File | Purpose |
 |------|---------|
-| `Race_SimulatorApp.swift` | App entry; `UIApplicationDelegateAdaptor` locks orientation to portrait |
+| `Race_SimulatorApp.swift` | App entry; `UIApplicationDelegateAdaptor` + `AppDelegate.orientationLock` for per-screen orientation |
 | `MainShellView.swift` | Tab container wiring; passes `selectedBottomTab` binding |
-| `JsonParser.swift` | All TJK API calls |
+| `JsonParser.swift` | All TJK JSON API calls |
+| `HtmlParser.swift` | TJK website HTML scraper for horse detail data |
 | `Horse.swift` | 50+ field model; custom `Codable` for mixed-type fields |
 | `Race.swift` | Race metadata + `[Horse]`; `decodeSafeBool` helper |
+| `HorseDetailView.swift` | Single horse detail page; takes `horseCode: String` + `formaURL: String?`; fetches via `HtmlParser` |
+| `SimulationSetupView.swift` | Portrait setup UI for 3D race (city/race picker, `AnimatedHorseCard` preview) |
+| `SimulationViewHorse3D.swift` | Landscape SceneKit 3D race; speed based on AGF + sinusoidal surge; live leaderboard HUD |
 | `RaceCardButton.swift` | City card button + `String.turkishCityUppercased` extension |
+| `ListItemView.swift` | Horse list row; LinkedIn-style drag-to-reveal swipe action; AGF progress bar |
 | `OddsViewModel.swift` | `@Observable` — Muhtemeller data, 15s refresh timer, `pistPerRun`, `havaData` |
 | `TicketViewModel.swift` | `@Observable` — bet selection, combination math, AI generation |
 | `OddsModels.swift` | `ProgramResponse`, `DynamicTableRow`, `TableCell`; `BetRaceDay.id = KEY` (not KOD) |
@@ -100,3 +111,4 @@ Background: `Color.black` base + `LinearGradient` top-to-bottom, `.animation(.ea
 - **`OddsViewModel` timer**: Must call `stopRefreshTimer()` on disappear (done via `.onDisappear`); verify any new navigation paths also call it.
 - **`BetRaceDay.id`**: Uses `KEY` (date-inclusive), not `KOD` — important for ForEach deduplication when same city races on multiple days.
 - **Date format**: Two formats in use (`yyyyMMdd` vs `yyyy/MM/dd`). Always check which endpoint expects which.
+- **`weatherSFSymbol` duplication**: Mapping from `icon-w-{1..8}` → SF Symbols is copy-pasted in both `RaceDetailView` and `OddsView`. No shared utility.
