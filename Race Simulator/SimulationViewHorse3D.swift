@@ -184,13 +184,13 @@ extension SimulationViewHorse3D {
                         if let image = phase.image {
                             image.resizable().aspectRatio(contentMode: .fill)
                         } else {
-                            Color(horse.horseColor).opacity(0.5)
+                            Color(horse.coatTheme.bg).opacity(0.5)
                         }
                     }
                     .frame(width: cardWidth, height: rowHeight)
                     .clipped()
                 } else {
-                    Color(horse.horseColor).opacity(0.5).frame(width: cardWidth, height: rowHeight)
+                    Color(horse.coatTheme.bg).opacity(0.5).frame(width: cardWidth, height: rowHeight)
                 }
                 
                 // 2. GÖLGE KATMANI: Siyah Gradient (Okunabilirliği artırır)

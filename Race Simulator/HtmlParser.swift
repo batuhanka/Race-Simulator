@@ -292,17 +292,15 @@ extension HtmlParser {
         return result
     }
     
-    /// Künye container'ı extract eder
     private func extractKunyeContainer(from html: String) -> String? {
-        // Önce künye-container div'ini bul
         let pattern = "<div[^>]*class=\"[^\"]*kunye-container[^\"]*\"[^>]*>(.*?)</div>"
         
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else {
+        guard (try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive])) != nil else {
             return nil
         }
         
         let nsString = html as NSString
-        let range = NSRange(location: 0, length: nsString.length)
+        _ = NSRange(location: 0, length: nsString.length)
         
         // Nested div'ler olabileceği için daha gelişmiş bir yaklaşım
         var startIndex: String.Index?

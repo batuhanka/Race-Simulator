@@ -19,9 +19,7 @@ struct HorseDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // TZ Style Arka Plan
-                Color.black
-                    .ignoresSafeArea()
+                Color.black.ignoresSafeArea()
                 
                 if isLoading {
                     VStack(spacing: 16) {
@@ -56,10 +54,7 @@ struct HorseDetailView: View {
                 } else if let detail = detailInfo {
                     ScrollView {
                         VStack(spacing: 0) {
-                            // TZ Style Hero Header (Title Bar Dahil)
                             heroHeaderSection(detail: detail)
-                            
-                            // Tek Birleşik Bilgi Kartı
                             
                             VStack(spacing: 16) {
                                 
@@ -91,38 +86,27 @@ struct HorseDetailView: View {
         }
     }
     
+    // MARK: - Helper Functions
+    private func formatCurrency(_ value: String) -> String {
+        return value.replacingOccurrences(of: "t", with: " ₺")
+                   .replacingOccurrences(of: "T", with: " ₺")
+    }
+    
     // MARK: - Data Loading
     private func loadHorseDetails() async {
-        print("🎯 [HorseDetailView] loadHorseDetails başladı - At Kodu: \(horseCode)")
-        
         await MainActor.run {
             isLoading = true
             errorMessage = nil
         }
         
         do {
-            print("🎯 [HorseDetailView] HtmlParser çağrılıyor...")
-            
-            // TJK web sitesinden at bilgilerini çek
             let info = try await HtmlParser.shared.parseAtKosuBilgileri(atId: horseCode)
-            
-            print("🎯 [HorseDetailView] ✅ Veri alındı!")
-            print("🎯 [HorseDetailView] İsim: '\(info.isim)'")
-            print("🎯 [HorseDetailView] Yaş: '\(info.yas)'")
-            print("🎯 [HorseDetailView] Doğum Tarihi: '\(info.dogumTarihi)'")
-            print("🎯 [HorseDetailView] Baba: '\(info.baba)'")
-            print("🎯 [HorseDetailView] Anne: '\(info.anne)'")
-            print("🎯 [HorseDetailView] İkramiye: '\(info.ikramiye)'")
             
             await MainActor.run {
                 self.detailInfo = info
                 self.isLoading = false
-                print("🎯 [HorseDetailView] UI güncellendi")
             }
         } catch {
-            print("🎯 [HorseDetailView] ❌ HATA: \(error)")
-            print("🎯 [HorseDetailView] Hata detayı: \(error.localizedDescription)")
-            
             await MainActor.run {
                 self.errorMessage = "At bilgileri yüklenemedi:\n\(error.localizedDescription)"
                 self.isLoading = false
@@ -317,19 +301,19 @@ struct HorseDetailView: View {
             Color.clear.frame(height: 8)
             
             // Finansal Özet
-            tzInfoRow(label: "İkramiye", value: detail.ikramiye, icon: "trophy.fill")
+            tzInfoRow(label: "İkramiye", value: formatCurrency(detail.ikramiye), icon: "trophy.fill")
             tzDivider()
-            tzInfoRow(label: "At Sahibi Primi", value: detail.atSahibiPrimi, icon: "dollarsign.circle.fill")
+            tzInfoRow(label: "At Sahibi Primi", value: formatCurrency(detail.atSahibiPrimi), icon: "dollarsign.circle.fill")
             tzDivider()
-            tzInfoRow(label: "Yurtdışı İkramiye", value: detail.yurtdisiIkramiye, icon: "globe")
+            tzInfoRow(label: "Yurtdışı İkramiye", value: formatCurrency(detail.yurtdisiIkramiye), icon: "globe")
             tzDivider()
-            tzInfoRow(label: "Kazanç", value: detail.kazanc, icon: "banknote.fill")
+            tzInfoRow(label: "Kazanç", value: formatCurrency(detail.kazanc), icon: "banknote.fill")
             tzDivider()
-            tzInfoRow(label: "Yetiştiricilik Primi", value: detail.yetistiricilikPrimi, icon: "leaf.circle.fill")
+            tzInfoRow(label: "Yetiştiricilik Primi", value: formatCurrency(detail.yetistiricilikPrimi), icon: "leaf.circle.fill")
             
             if let sponsorluk = detail.sponsorlukGeliri, !sponsorluk.isEmpty {
                 tzDivider()
-                tzInfoRow(label: "Sponsorluk Geliri", value: sponsorluk, icon: "briefcase.fill")
+                tzInfoRow(label: "Sponsorluk Geliri", value: formatCurrency(sponsorluk), icon: "briefcase.fill")
             }
         }
     }
@@ -455,37 +439,6 @@ struct HorseDetailView: View {
     }
 }
 
-// MARK: - Preview Support
-extension HorseDetailInfo {
-    static let gayecanExample = HorseDetailInfo(
-        isim: "GAYECAN",
-        yas: "6 y kk",
-        dogumTarihi: "1.03.2020",
-        handikap: "73",
-        baba: "TÜMÖZ BEY",
-        anne: "BUDAPEŞTELİ / DEMİRKAZIK",
-        antrenor: "B.DEMİRKAPU",
-        gercekSahip: "AYDIN TEKİN (%100)",
-        uzerineKosanSahip: "AYDIN TEKİN",
-        yetistirici: "SULTANSUYU T. İŞL.",
-        tercihAciklamasi: "",
-        ikramiye: "2.516.550₺",
-        atSahibiPrimi: "443.783₺",
-        yurtdisiIkramiye: "0₺",
-        kazanc: "2.960.333₺",
-        yetistiricilikPrimi: "490.768₺",
-        sponsorlukGeliri: ""
-    )
-}
-
-// MARK: - Preview
-#Preview("GAYECAN - Örnek At") {
-    HorseDetailView(
-        horseCode: "101209",
-        formaURL: "https://medya-cdn.tjk.org/formaftp/101209.jpg"
-    )
-    .preferredColorScheme(.dark)
-}
 
 #Preview("Canlı Veri - 101209") {
     HorseDetailView(

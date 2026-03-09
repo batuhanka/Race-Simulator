@@ -365,7 +365,6 @@ struct AnimatedHorseCard: View {
     
     var body: some View {
         ZStack(alignment: .leading) {
-            // 1. ARKA PLAN: Forma Görseli (Tüm kartı kaplar)
             if let formaLink = at.FORMA, let url = URL(string: formaLink) {
                 AsyncImage(url: url) { phase in
                     switch phase {
@@ -374,15 +373,15 @@ struct AnimatedHorseCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     case .failure, .empty:
-                        Color(at.horseColor).opacity(0.5) // Yüklenemezse atın rengini koy
+                        at.coatTheme.bg.opacity(0.5) 
                     @unknown default:
                         Color.black
                     }
                 }
                 .frame(height: 65)
-                .clipped() // Kart dışına taşmayı engeller
+                .clipped()
             } else {
-                Color(at.horseColor).opacity(0.5)
+                at.coatTheme.bg.opacity(0.5)
                     .frame(height: 65)
             }
             
@@ -401,7 +400,6 @@ struct AnimatedHorseCard: View {
                     .font(.system(size: 28, weight: .heavy))
                     .italic()
                     .foregroundColor(.white)
-                    // DÜZELTME BURADA: Genişliği 45 yaptık ve sığmazsa küçül komutu verdik
                     .frame(width: 45, alignment: .center)
                     .minimumScaleFactor(0.7)
                     .lineLimit(1)
@@ -432,65 +430,4 @@ struct AnimatedHorseCard: View {
         .offset(y: isVisible ? 0 : 30)
         .animation(.easeOut(duration: 0.8), value: isVisible)
     }
-}
-
-// MARK: - PREVIEW
-#Preview {
-    // 1. Mock Atlar (Gerçek TJK forma linki ile)
-    let h1 = Horse(
-        KOD: "1001",
-        NO: "1",
-        AD: "GÜLŞAH SULTAN",
-        START: "1",
-        JOKEYADI: "H. KARATAŞ",
-        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
-    )
-    
-    let h2 = Horse(
-        KOD: "1002",
-        NO: "2",
-        AD: "RÜZGAR GİBİ",
-        START: "2",
-        JOKEYADI: "S. KAYA",
-        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
-    )
-    
-    let h3 = Horse(
-        KOD: "1003",
-        NO: "3",
-        AD: "ŞAMPİYON TAY",
-        START: "3",
-        JOKEYADI: "A. KURŞUN",
-        FORMA: "https://medya-cdn.tjk.org/formaftp/7485.jpg"
-    )
-    
-    // 2. Mock Koşular
-    let mockRace1 = Race(
-        KOD: "901",
-        RACENO: "1",
-        SAAT: "14:00",
-        BILGI_TR: "3 Yaşlı İngilizler",
-        MESAFE: "1400",
-        atlar: [h1, h2, h3]
-    )
-    
-    let mockRace2 = Race(
-        KOD: "902",
-        RACENO: "2",
-        SAAT: "14:30",
-        BILGI_TR: "4 Yaşlı Araplar",
-        MESAFE: "1600",
-        atlar: [h1, h2]
-    )
-    
-    let today = Date()
-    
-    NavigationStack {
-        SimulationSetupView(
-            selectedDate: today,
-            availableCities: ["ADANA", "ANTALYA"],
-            initialCity: "ADANA"
-        )
-    }
-    .preferredColorScheme(.dark)
 }
