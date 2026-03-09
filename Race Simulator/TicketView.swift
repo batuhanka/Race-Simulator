@@ -372,7 +372,7 @@ extension TicketView {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.bottom, 20)
+            .padding(.bottom, 16)
         }
     }
 }

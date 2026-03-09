@@ -25,6 +25,12 @@ struct BetType: Codable, Identifiable, Hashable {
     let BAHIS: String
     let POOLUNIT: Int
     let kosular: [Int]
+
+    /// Splits a multi-start bet (kosular: [1, 3]) into separate single-start entries.
+    func expanded() -> [BetType] {
+        guard kosular.count > 1 else { return [self] }
+        return kosular.sorted().map { BetType(TYPE: TYPE, BAHIS: BAHIS, POOLUNIT: POOLUNIT, kosular: [$0]) }
+    }
 }
 
 struct BetRaceDay: Codable, Identifiable, Hashable {

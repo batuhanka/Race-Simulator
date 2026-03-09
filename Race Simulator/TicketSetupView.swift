@@ -11,13 +11,25 @@ struct TicketSetupView: View {
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "tr_TR")
-        formatter.dateFormat = "EEEE"
+        formatter.dateFormat = "d MMMM EEEE"
         return formatter
     }()
+
+    fileprivate struct PresetCouponResult {
+        let dayIndex: Int
+        let budget: Int
+        let city: String
+        let betLabel: String
+        let actualCost: Double
+        let legs: [[String]]  // horse numbers per leg
+    }
 
     @State private var navigateToTicket = false
     @State private var showAISettings = false
     @State private var isLoadingData = false
+    @State private var presetCity1: String? = nil
+    @State private var presetCity2: String? = nil
+    @State private var presetResults: [String: PresetCouponResult] = [:]
     // AI Ayarları
     @State private var raceDays: [BetRaceDay] = []
     @State private var selectedDayIndex: Int = 0
@@ -67,6 +79,11 @@ struct TicketSetupView: View {
                                     navigateToTicket = true
                                 }
                             )
+                            PresetCouponsView(
+                                results: presetResults,
+                                onSelect: { dayIndex, budget in presetGenerate(dayIndex: dayIndex, budgetAmount: budget) }
+                            )
+                                .padding(.top, 8)
                         } else {
                             AISettingsView(
                                 raceDays: raceDays,
@@ -111,8 +128,9 @@ struct TicketSetupView: View {
             .onChange(of: navigateToTicket) { _, isNavigating in
                 if !isNavigating && showAISettings { resetAIState() }
             }
+            .task { await loadPresetCities() }
         }
-        
+
     }
     
     // MARK: - Logic Helpers
@@ -121,8 +139,10 @@ struct TicketSetupView: View {
         let ganyans = currentGanyanTypes
         let priorities = ["6'lı", "5'li", "4'lü", "3'lü"]
         for p in priorities {
-            if let index = ganyans.firstIndex(where: { $0.BAHIS.contains(p) }) {
-                selectedBetIndex = index
+            // Prefer 2nd (last) within same category, otherwise 1st
+            let matching = ganyans.indices.filter { ganyans[$0].BAHIS.contains(p) }
+            if let lastIdx = matching.last {
+                selectedBetIndex = lastIdx
                 return
             }
         }
@@ -169,53 +189,7 @@ struct TicketSetupView: View {
         Task.detached(priority: .userInitiated) {
             let races = await filteredRacesForAI(for: day, betType: bet)
             let unitPrice = Double(bet.POOLUNIT) / 100.0
-            
-            // Compute best selections in a local scope
-            let result: [String: Set<String>] = {
-                var bestSelections: [String: Set<String>] = [:]
-                var bestPriceFound = 0.0
-                
-                for _ in 0..<10 {
-                    var currentSelections: [String: Set<String>] = [:]
-                    for r in races {
-                        let fav = r.atlar?.filter({ $0.KOSMAZ != true }).sorted(by: { ($0.AGF1 ?? 0) > ($1.AGF1 ?? 0) }).first
-                        currentSelections[r.KOD] = fav != nil ? [fav!.KOD] : []
-                    }
-                    
-                    var canImprove = true
-                    while canImprove {
-                        canImprove = false
-                        var validMoves: [(raceKod: String, horseKod: String, nextPrice: Double)] = []
-                        let currentCombos = races.reduce(1.0) { $0 * Double(max(currentSelections[$1.KOD]?.count ?? 0, 1)) }
-                        
-                        for r in races {
-                            let selectedInRace = currentSelections[r.KOD] ?? []
-                            let available = r.atlar?.filter { h in h.KOSMAZ != true && !selectedInRace.contains(h.KOD) }
-                                .sorted(by: { ($0.AGF1 ?? 0) > ($1.AGF1 ?? 0) }) ?? []
-                            
-                            if let nextHorse = available.first {
-                                let count = Double(max(selectedInRace.count, 1))
-                                let nextPrice = (currentCombos / count) * (count + 1) * unitPrice
-                                if nextPrice <= maxBudget { validMoves.append((r.KOD, nextHorse.KOD, nextPrice)) }
-                            }
-                        }
-                        
-                        if let move = validMoves.randomElement() {
-                            currentSelections[move.raceKod]?.insert(move.horseKod)
-                            canImprove = true
-                        }
-                    }
-                    
-                    let finalPrice = races.reduce(1.0) { $0 * Double(max(currentSelections[$1.KOD]?.count ?? 0, 1)) } * unitPrice
-                    if finalPrice > bestPriceFound {
-                        bestPriceFound = finalPrice
-                        bestSelections = currentSelections
-                    }
-                }
-                
-                return bestSelections
-            }()
-            
+            let result = TicketSetupView.computeAISelections(races: races, maxBudget: maxBudget, unitPrice: unitPrice)
             await MainActor.run {
                 self.autoGeneratedHorses = result
                 self.isLoadingData = false
@@ -227,14 +201,15 @@ struct TicketSetupView: View {
     private func getGanyanTypes(for day: BetRaceDay?) -> [BetType] {
         guard let day = day else { return [] }
         let allowed = ["6'lı Ganyan", "5'li Ganyan", "4'lü Ganyan", "3'lü Ganyan"]
-        return day.bahisler.filter { type in allowed.contains { type.BAHIS.localizedCaseInsensitiveContains($0) } }
+        return day.bahisler
+            .filter { type in allowed.contains { type.BAHIS.localizedCaseInsensitiveContains($0) } }
+            .flatMap { $0.expanded() }
     }
     
     private func betTypeLabelForAI(for type: BetType, list: [BetType]) -> String {
-        let sameNameTypes = list.filter { $0.BAHIS == type.BAHIS }
-        if sameNameTypes.count > 1 {
-            let sortedByRace = sameNameTypes.sorted { ($0.kosular.first ?? 0) < ($1.kosular.first ?? 0) }
-            if let index = sortedByRace.firstIndex(where: { $0.id == type.id }) { return "\(index + 1). \(type.BAHIS.uppercased())" }
+        let sameGroup = list.filter { $0.BAHIS == type.BAHIS }
+        if sameGroup.count > 1, let index = sameGroup.firstIndex(where: { $0.id == type.id }) {
+            return "\(index + 1). \(type.BAHIS.uppercased())"
         }
         return type.BAHIS.uppercased()
     }
@@ -243,9 +218,140 @@ struct TicketSetupView: View {
         guard let day = day else { return "Seçiniz" }
         let yer = day.YER.turkishCityUppercased
         if let date = Self.dateFormatter.date(from: day.TARIH) {
-            return "\(yer) (\(Self.dayFormatter.string(from: date).uppercased()))"
+            return "\(yer) - \(Self.dayFormatter.string(from: date).uppercased(with: Locale(identifier: "tr_TR")))"
         }
         return yer
+    }
+
+    private func loadPresetCities() async {
+        guard presetCity1 == nil else { return }
+        do {
+            let decoded = try await JsonParser().getBetData()
+            let filtered = decoded.data.yarislar.filter { (Int($0.KOD) ?? 99) < 11 }
+            let daysWithSixli = filtered.filter { getGanyanTypes(for: $0).contains { $0.BAHIS.contains("6'lı") } }
+            presetCity1 = daysWithSixli.first?.YER.turkishCityUppercased
+            presetCity2 = daysWithSixli.dropFirst().first?.YER.turkishCityUppercased
+
+            for (dayIndex, raceDay) in daysWithSixli.prefix(2).enumerated() {
+                let ganyans = getGanyanTypes(for: raceDay)
+                let sixliList = ganyans.filter { $0.BAHIS.contains("6'lı") }
+                guard let bet = sixliList.count >= 2 ? sixliList[1] : sixliList.first ?? ganyans.first else { continue }
+                let betLabel = betTypeLabelForAI(for: bet, list: ganyans)
+                let city = raceDay.YER.turkishCityUppercased
+                let races = filteredRacesForAI(for: raceDay, betType: bet)
+                let unitPrice = Double(bet.POOLUNIT) / 100.0
+
+                for budget in [500, 1000] {
+                    let maxBudget = Double(budget)
+                    let key = "\(dayIndex)_\(budget)"
+                    Task.detached(priority: .utility) {
+                        let selections = TicketSetupView.computeAISelections(
+                            races: races, maxBudget: maxBudget, unitPrice: unitPrice
+                        )
+                        let actualCost = races.reduce(1.0) {
+                            $0 * Double(max(selections[$1.KOD]?.count ?? 0, 1))
+                        } * unitPrice
+                        let legs: [[String]] = races.map { race in
+                            let selectedKods = selections[race.KOD] ?? []
+                            return race.atlar?
+                                .filter { selectedKods.contains($0.KOD) }
+                                .compactMap { Int($0.NO) }
+                                .sorted()
+                                .map { String($0) } ?? []
+                        }
+                        await MainActor.run {
+                            self.presetResults[key] = PresetCouponResult(
+                                dayIndex: dayIndex, budget: budget,
+                                city: city, betLabel: betLabel,
+                                actualCost: actualCost, legs: legs
+                            )
+                        }
+                    }
+                }
+            }
+        } catch {}
+    }
+
+    private func presetGenerate(dayIndex: Int, budgetAmount: Int) {
+        isLoadingData = true
+        Task {
+            do {
+                let decoded = try await JsonParser().getBetData()
+                let filtered = decoded.data.yarislar.filter { (Int($0.KOD) ?? 99) < 11 }
+                let daysWithSixli = filtered.filter { getGanyanTypes(for: $0).contains { $0.BAHIS.contains("6'lı") } }
+
+                guard dayIndex < daysWithSixli.count else {
+                    await MainActor.run { isLoadingData = false }
+                    return
+                }
+
+                let raceDay = daysWithSixli[dayIndex]
+                let ganyans = getGanyanTypes(for: raceDay)
+                let sixliList = ganyans.filter { $0.BAHIS.contains("6'lı") }
+                let targetBet = sixliList.count >= 2 ? sixliList[1] : sixliList.first ?? ganyans.first
+
+                guard let bet = targetBet else {
+                    await MainActor.run { isLoadingData = false }
+                    return
+                }
+
+                let allDayIdx = filtered.firstIndex(where: { $0.id == raceDay.id }) ?? 0
+                let betIdx = ganyans.firstIndex(where: { $0.id == bet.id }) ?? 0
+
+                await MainActor.run {
+                    self.raceDays = filtered
+                    self.selectedDayIndex = allDayIdx
+                    self.selectedBetIndex = betIdx
+                    self.budget = "\(budgetAmount)"
+                    self.autoGeneratedHorses = nil
+                    self.isLoadingData = false
+                    self.generateAIKupon()
+                }
+            } catch {
+                await MainActor.run { isLoadingData = false }
+            }
+        }
+    }
+
+    private static func computeAISelections(
+        races: [BetRace], maxBudget: Double, unitPrice: Double
+    ) -> [String: Set<String>] {
+        var bestSelections: [String: Set<String>] = [:]
+        var bestPriceFound = 0.0
+        for _ in 0..<10 {
+            var currentSelections: [String: Set<String>] = [:]
+            for r in races {
+                let fav = r.atlar?.filter({ $0.KOSMAZ != true })
+                    .sorted(by: { ($0.AGF1 ?? 0) > ($1.AGF1 ?? 0) }).first
+                currentSelections[r.KOD] = fav != nil ? [fav!.KOD] : []
+            }
+            var canImprove = true
+            while canImprove {
+                canImprove = false
+                var validMoves: [(raceKod: String, horseKod: String, nextPrice: Double)] = []
+                let currentCombos: Double = races.reduce(1.0) { acc, r in
+                    let cnt = currentSelections[r.KOD]?.count ?? 0
+                    return acc * Double(max(cnt, 1))
+                }
+                for r in races {
+                    let selectedInRace = currentSelections[r.KOD] ?? []
+                    let available = r.atlar?.filter { h in h.KOSMAZ != true && !selectedInRace.contains(h.KOD) }
+                        .sorted(by: { ($0.AGF1 ?? 0) > ($1.AGF1 ?? 0) }) ?? []
+                    if let nextHorse = available.first {
+                        let count = Double(max(selectedInRace.count, 1))
+                        let nextPrice = (currentCombos / count) * (count + 1) * unitPrice
+                        if nextPrice <= maxBudget { validMoves.append((r.KOD, nextHorse.KOD, nextPrice)) }
+                    }
+                }
+                if let move = validMoves.randomElement() {
+                    currentSelections[move.raceKod]?.insert(move.horseKod)
+                    canImprove = true
+                }
+            }
+            let finalPrice = races.reduce(1.0) { $0 * Double(max(currentSelections[$1.KOD]?.count ?? 0, 1)) } * unitPrice
+            if finalPrice > bestPriceFound { bestPriceFound = finalPrice; bestSelections = currentSelections }
+        }
+        return bestSelections
     }
 
     private func filteredRacesForAI(for raceDay: BetRaceDay, betType: BetType) -> [BetRace] {
@@ -504,6 +610,128 @@ private extension TicketSetupView {
         }
     }
     
+    struct PresetCouponsView: View {
+        private let results: [String: PresetCouponResult]
+        let onSelect: (Int, Int) -> Void
+        
+        init(results: [String: PresetCouponResult], onSelect: @escaping (Int, Int) -> Void) {
+            self.results = results
+            self.onSelect = onSelect
+        }
+
+        private struct CardItem: Identifiable {
+            let id = UUID()
+            let dayIndex: Int
+            let budget: Int
+        }
+        private let items: [CardItem] = [
+            CardItem(dayIndex: 0, budget: 500),
+            CardItem(dayIndex: 0, budget: 1000),
+            CardItem(dayIndex: 1, budget: 500),
+            CardItem(dayIndex: 1, budget: 1000),
+        ]
+
+        private func formatCost(_ amount: Double) -> String {
+            let val = Int(amount)
+            if val >= 1000 { return "₺\(val / 1000).\(String(format: "%03d", val % 1000))" }
+            return "₺\(val)"
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.cyan)
+                    Text("TAYZEKA HAZIR KUPONLARI")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundColor(.white.opacity(0.4))
+                        .tracking(1.2)
+                }
+                .padding(.horizontal, 4)
+
+                VStack(spacing: 10) {
+                    ForEach(items) { item in
+                        let key = "\(item.dayIndex)_\(item.budget)"
+                        Button { onSelect(item.dayIndex, item.budget) } label: {
+                            couponCard(result: results[key], budget: item.budget)
+                        }
+                        .buttonStyle(CardPressEffectStyle())
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+
+        private func couponCard(result: PresetCouponResult?, budget: Int) -> some View {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(LinearGradient(
+                        colors: [Color(white: 0.13), Color(white: 0.09)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.cyan.opacity(0.18), lineWidth: 1)
+
+                if let result {
+                    VStack(alignment: .leading, spacing: 10) {
+                        // Top-left: city + bet label
+                        HStack(spacing: 5) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(.cyan.opacity(0.7))
+                            Text(result.city)
+                                .font(.system(size: 13, weight: .black))
+                                .foregroundColor(.white)
+                            Text("·")
+                                .foregroundColor(.white.opacity(0.3))
+                            Text(result.betLabel)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.cyan.opacity(0.75))
+                        }
+
+                        // 6 leg columns
+                        HStack(alignment: .top, spacing: 0) {
+                            ForEach(Array(result.legs.enumerated()), id: \.offset) { legIdx, horses in
+                                VStack(spacing: 3) {
+                                    Text("\(legIdx + 1).")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.3))
+                                    ForEach(horses, id: \.self) { no in
+                                        Text(no)
+                                            .font(.system(size: 15, weight: .black, design: .rounded))
+                                            .foregroundColor(.cyan)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+
+                        // Bottom-right: actual cost
+                        HStack {
+                            Spacer()
+                            Text(formatCost(result.actualCost))
+                                .font(.system(size: 17, weight: .black, design: .rounded))
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(14)
+                } else {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.65).tint(.cyan)
+                        Text("Kupon hazırlanıyor...")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .shadow(color: .cyan.opacity(0.06), radius: 8, x: 0, y: 4)
+        }
+    }
+
     struct ProcessingOverlay: View {
         let text: String
         let themePrimary: Color
@@ -526,5 +754,10 @@ private extension TicketSetupView {
             }
         }
     }
+}
+
+#Preview {
+    TicketSetupView()
+        .preferredColorScheme(.dark)
 }
 

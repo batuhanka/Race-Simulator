@@ -37,9 +37,9 @@ class TicketViewModel {
     var ganyanBetTypes: [BetType] {
         guard let raceDay = selectedRaceDay else { return [] }
         let allowedTypes = ["6'lı Ganyan", "5'li Ganyan", "4'lü Ganyan", "3'lü Ganyan"]
-        return raceDay.bahisler.filter { type in
-            allowedTypes.contains { type.BAHIS.localizedCaseInsensitiveContains($0) }
-        }
+        return raceDay.bahisler
+            .filter { type in allowedTypes.contains { type.BAHIS.localizedCaseInsensitiveContains($0) } }
+            .flatMap { $0.expanded() }
     }
 
     // MARK: - onChange Handlers
@@ -48,11 +48,11 @@ class TicketViewModel {
         guard hasLoadedInitially else { return }
         let isFirst = isFirstRaceDayChange
         isFirstRaceDayChange = false
+        // On the first onChange after load, preserve AI-generated bet type and selections
+        if isFirst && initialSelections != nil { return }
         if let bahisler = newValue?.bahisler {
             selectedBetType = findPriorityBetType(in: bahisler)
         }
-        // On the first onChange after load, preserve AI-generated selections
-        if isFirst && initialSelections != nil { return }
         resetSelections()
     }
 
@@ -186,23 +186,16 @@ class TicketViewModel {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd/MM/yyyy"
         guard let date = formatter.date(from: day.TARIH) else { return day.YER.turkishCityUppercased }
-        let dayFormatter = DateFormatter()
-        dayFormatter.locale = Locale(identifier: "tr_TR")
-        dayFormatter.dateFormat = "EEEE"
-        return "\(day.YER.turkishCityUppercased) (\(dayFormatter.string(from: date).uppercased()))"
+        let displayFormatter = DateFormatter()
+        displayFormatter.locale = Locale(identifier: "tr_TR")
+        displayFormatter.dateFormat = "d MMMM EEEE"
+        return "\(day.YER.turkishCityUppercased) - \(displayFormatter.string(from: date).uppercased(with: Locale(identifier: "tr_TR")))"
     }
 
     func betTypeLabel(for type: BetType) -> String {
-        let allowed = ["6'lı Ganyan", "5'li Ganyan", "4'lü Ganyan", "3'lü Ganyan"]
-        let filteredList = (selectedRaceDay?.bahisler ?? []).filter { t in
-            allowed.contains { t.BAHIS.localizedCaseInsensitiveContains($0) }
-        }
-        let sameNameTypes = filteredList.filter { $0.BAHIS == type.BAHIS }
-        if sameNameTypes.count > 1 {
-            let sorted = sameNameTypes.sorted { ($0.kosular.first ?? 0) < ($1.kosular.first ?? 0) }
-            if let index = sorted.firstIndex(where: { $0.id == type.id }) {
-                return "\(index + 1). \(type.BAHIS.uppercased())"
-            }
+        let sameGroup = ganyanBetTypes.filter { $0.BAHIS == type.BAHIS }
+        if sameGroup.count > 1, let index = sameGroup.firstIndex(where: { $0.id == type.id }) {
+            return "\(index + 1). \(type.BAHIS.uppercased())"
         }
         return type.BAHIS.uppercased()
     }
@@ -211,7 +204,9 @@ class TicketViewModel {
         let priority = ["6'lı Ganyan", "5'li Ganyan", "4'lü Ganyan", "3'lü Ganyan"]
         for name in priority {
             if let found = types.first(where: { $0.BAHIS.localizedCaseInsensitiveContains(name) }) {
-                return found
+                let expanded = found.expanded()
+                // Prefer 2nd (last) if multiple exist, otherwise 1st
+                return expanded.last ?? expanded.first
             }
         }
         return nil

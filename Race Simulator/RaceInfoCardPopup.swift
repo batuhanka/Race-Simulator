@@ -299,8 +299,8 @@ struct RaceInfoCardPopup: View {
                     Image(systemName: "trophy")
                         .font(.system(size: 32))
                         .foregroundColor(.white.opacity(0.3))
-                    Text("AGF sonucu bulunamadı")
-                        .font(.caption)
+                    Text("Sonuç bulunamadı.")
+                        .font(.footnote)
                         .foregroundColor(.white.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
